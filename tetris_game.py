@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-#-*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 
 # Very simple tetris implementation
 # 
@@ -35,27 +35,26 @@
 from random import randrange as rand
 from itertools import permutations
 import pygame, sys
-import Agent
-from copy import copy,deepcopy
+from copy import copy, deepcopy
 
 # The configuration
 config = {
     'cell_size':    20,
-    'cols':        8,
-    'rows':        16,
+    'cols':        16,
+    'rows':        32,
     'delay':    750,
     'maxfps':    30
 }
 
 colors = [
-(0,   0,   0  ),
-(255, 0,   0  ),
-(0,   150, 0  ),
-(0,   0,   255),
-(255, 120, 0  ),
-(255, 255, 0  ),
-(180, 0,   255),
-(0,   220, 220)
+(0, 0, 0),
+(255, 0, 0),
+(0, 150, 0),
+(0, 0, 255),
+(255, 120, 0),
+(255, 255, 0),
+(180, 0, 255),
+(0, 220, 220)
 ]
 
 # Define the shapes of the single parts
@@ -81,10 +80,12 @@ tetris_shapes = [
      [7, 7]]
 ]
 
+
 def rotate_clockwise(shape):
     return [ [ shape[y][x]
             for y in range(len(shape)) ]
         for x in range(len(shape[0]) - 1, -1, -1) ]
+
 
 def check_collision(board, shape, offset):
     off_x, off_y = offset
@@ -97,16 +98,19 @@ def check_collision(board, shape, offset):
                 return True
     return False
 
+
 def remove_row(board, row):
     del board[row]
     return [[0 for i in range(config['cols'])]] + board
+
     
 def join_matrixes(mat1, mat2, mat2_off):
     off_x, off_y = mat2_off
     for cy, row in enumerate(mat2):
         for cx, val in enumerate(row):
-            mat1[cy+off_y-1    ][cx+off_x] += val
+            mat1[cy + off_y - 1    ][cx + off_x] += val
     return mat1
+
 
 def new_board():
     board = [ [ 0 for x in range(config['cols']) ]
@@ -114,28 +118,25 @@ def new_board():
     board += [[ 1 for x in range(config['cols'])]]
     return board
 
+
 class TetrisApp(object):
+
     def __init__(self):
         # we could remove this for speed without visibility
         pygame.init()
-        #pygame.key.set_repeat(250,25)
-        self.width = config['cell_size']*config['cols']
-        self.height = config['cell_size']*config['rows']
+        # pygame.key.set_repeat(250,25)
+        self.width = config['cell_size'] * config['cols']
+        self.height = config['cell_size'] * config['rows']
         
         self.screen = pygame.display.set_mode((self.width, self.height))
-        pygame.event.set_blocked(pygame.MOUSEMOTION) # We do not need
-                                 # mouse movement
-                                 # events, so we
-                                 # block them.
+        # We do not need mouse movement events, so we block them.
+        pygame.event.set_blocked(pygame.MOUSEMOTION) 
         self.init_game()
-
-
     
     def new_stone(self):
         self.stone = tetris_shapes[rand(len(tetris_shapes))]
-        self.stone_x = int(config['cols'] / 2 - len(self.stone[0])/2)
+        self.stone_x = int(config['cols'] / 2 - len(self.stone[0]) / 2)
         self.stone_y = 0
-
         
         if check_collision(self.board,
                             self.stone,
@@ -147,23 +148,26 @@ class TetrisApp(object):
         self.paused = False
         self.board = new_board()
         self.new_stone()
+        
+        self.score = 0
+        self.score_last_screen = 0
     
     def center_msg(self, msg):
         for i, line in enumerate(msg.splitlines()):
-            msg_image =  pygame.font.Font(
+            msg_image = pygame.font.Font(
                 pygame.font.get_default_font(), 12).render(
-                    line, False, (255,255,255), (0,0,0))
+                    line, False, (255, 255, 255), (0, 0, 0))
         
             msgim_center_x, msgim_center_y = msg_image.get_size()
             msgim_center_x //= 2
             msgim_center_y //= 2
         
             self.screen.blit(msg_image, (
-              self.width // 2-msgim_center_x,
-              self.height // 2-msgim_center_y+i*22))
+              self.width // 2 - msgim_center_x,
+              self.height // 2 - msgim_center_y + i * 22))
     
     def draw_matrix(self, matrix, offset):
-        off_x, off_y  = offset
+        off_x, off_y = offset
         for y, row in enumerate(matrix):
             for x, val in enumerate(row):
                 if val:
@@ -171,12 +175,12 @@ class TetrisApp(object):
                         self.screen,
                         colors[val],
                         pygame.Rect(
-                            (off_x+x) *
+                            (off_x + x) * 
                               config['cell_size'],
-                            (off_y+y) *
-                              config['cell_size'], 
+                            (off_y + y) * 
+                              config['cell_size'],
                             config['cell_size'],
-                            config['cell_size']),0)
+                            config['cell_size']), 0)
     
     def move(self, delta_x):
         if not self.gameover and not self.paused:
@@ -189,9 +193,10 @@ class TetrisApp(object):
                            self.stone,
                            (new_x, self.stone_y)):
                 self.stone_x = new_x
+
     def quit(self):
-        #self.center_msg("Exiting...")
-        #pygame.display.update()
+        # self.center_msg("Exiting...")
+        # pygame.display.update()
         sys.exit()
     
     def drop(self):
@@ -225,7 +230,6 @@ class TetrisApp(object):
     
     def toggle_pause(self):
         self.paused = not self.paused
-
     
     def start_game(self):
         self.score = 0
@@ -249,31 +253,31 @@ class TetrisApp(object):
         self.gameover = False
         self.paused = False
         
-        pygame.time.set_timer(pygame.USEREVENT+1, config['delay'])
+        pygame.time.set_timer(pygame.USEREVENT + 1, config['delay'])
         dont_burn_my_cpu = pygame.time.Clock()
         while 1:
             for event in pygame.event.get():
-                if event.type == pygame.USEREVENT+1:
+                if event.type == pygame.USEREVENT + 1:
                     self.drop()
                 elif event.type == pygame.QUIT:
                     self.quit()
                 elif event.type == pygame.KEYDOWN:
                     for key in key_actions:
-                        if event.key == eval("pygame.K_"+key):
+                        if event.key == eval("pygame.K_" + key):
                             key_actions[key]()
                 
-            self.step(action=-1,render=True)
+            self.step(action=0, render=True)
             dont_burn_my_cpu.tick(config['maxfps'])
 
     def draw_screen(self):
-        self.screen.fill((0,0,0))
+        self.screen.fill((0, 0, 0))
         if(self.gameover):
             self.center_msg("Game Over")
         else:
             if self.paused:
                 self.center_msg("Paused")
             else:
-                self.draw_matrix(self.board, (0,0))
+                self.draw_matrix(self.board, (0, 0))
                 self.draw_matrix(self.stone,
                          (self.stone_x,
                           self.stone_y))
@@ -289,14 +293,14 @@ class TetrisApp(object):
         # add the stone into the board
         for row in range(len(stone_matrix)):
             for col in range(len(stone_matrix[row])):
-                board[stone_y+row][stone_x+col] = stone_matrix[row][col]
+                board[stone_y + row][stone_x + col] = stone_matrix[row][col]
         return board
     
-    def step(self,action,render=True):
+    def step(self, action, render=True):
         actions = {
-                1:  lambda:self.move(-1), #move left
-                2:  lambda:self.move(+1), # move right
-                3:  self.rotate_stone # rotate stone
+                1:  lambda:self.move(-1),  # move left
+                2:  lambda:self.move(+1),  # move right
+                3:  self.rotate_stone  # rotate stone
                 }
         
         if(render):
@@ -307,17 +311,15 @@ class TetrisApp(object):
         self.drop()
         # check for game over
         if(self.gameover):
-            return [[],0,True]
+            return [[], 0, True]
         obs = []
         obs = self.construct_state()
         done = False
         # number of blocks done in the last round
         reward = self.score - self.score_last_screen
         self.score_last_screen = self.score
-        
 
-        return [obs,reward,done]
-
+        return [obs, reward, done]
         
 
 if __name__ == '__main__':
