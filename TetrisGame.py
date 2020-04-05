@@ -9,6 +9,7 @@ SIZE_SCALE = 1
 SPEED_DEFAULT = 750  # 750 MS
 SPEED_SCALE_ENABLED = True  # game gets faster with more points?
 SPEED_SCALE = 1.5  # speed = max(50, 750 - SCORE * SPEED_SCALE)
+DISPLAY_PREDICTION = True
 
 COLORS = {
     # Display
@@ -28,13 +29,13 @@ COLORS = {
 }
 
 # Configurations (SYSTEM)
-GRID_ROW_COUNT = 24
+GRID_ROW_COUNT = 20
 GRID_COL_COUNT = 10
 
-SCREEN_WIDTH = int(360 / 0.8 * SIZE_SCALE) 
+SCREEN_WIDTH = int(360 / 0.6 * SIZE_SCALE) 
 SCREEN_HEIGHT = int(720 * SIZE_SCALE)
 
-MAX_FPS = 30
+MAX_FPS = 60
 
 MULTI_SCORE_ALGORITHM = lambda a: 2 ** a;
 
@@ -96,12 +97,12 @@ class TetrisGame:
         
         # Keyboard integration
         self.key_actions = {
-             "ESCAPE": self.toggle_pause,
+            "ESCAPE": self.toggle_pause,
             "LEFT": lambda: self.move_tile(-1),
             "RIGHT": lambda: self.move_tile(1),
-            "DOWN": self.drop,
-            "UP": self.rotate_tile,
-            "SPACE": self.reset
+            "DOWN": lambda: self.drop(False),
+            "SPACE": lambda: self.drop(True),
+            "UP": self.rotate_tile
         }
         
         # Tile generation
@@ -151,13 +152,18 @@ class TetrisGame:
         # Tetris (tile) layer
         # Draw board first
         self.draw_tiles(self.board)
+        # Draw hypothesized tile
+        if DISPLAY_PREDICTION:
+            self.draw_tiles(self.tile_shape, (self.tile_x, self.get_current_collision_offset()), True)
         # Draw current tile
         self.draw_tiles(self.tile_shape, (self.tile_x, self.tile_y))
+
+#         self.draw_tiles(TILE_SHAPES.get(self.get_next_tile()), (self.tile_x, 0), True)
 
         pygame.display.update()
     
     # Draw the tetris tiles
-    def draw_tiles(self, matrix, offsets=(0, 0)):
+    def draw_tiles(self, matrix, offsets=(0, 0), outline_only=False):
         for y, row in enumerate(matrix):
             for x, val in enumerate(row):
                 if val == 0:
@@ -165,19 +171,25 @@ class TetrisGame:
                 coord_x = (offsets[0] + x) * self.grid_size
                 coord_y = (offsets[1] + y) * self.grid_size
                 # Draw rectangle
-                pygame.draw.rect(self.screen, getColorTuple(COLORS.get("TILE_" + TILES[val - 1])),
-                                 (coord_x, coord_y, self.grid_size, self.grid_size))
-                pygame.draw.rect(self.screen, getColorTuple(COLORS.get("BACKGROUND_BLACK")),
-                                 (coord_x, coord_y, self.grid_size, self.grid_size), 1)
-                offset = int(self.grid_size / 10)
-                # Draw highlight triangle
-                pygame.draw.polygon(self.screen, getColorTuple(COLORS.get("TRIANGLE_GRAY")), ((coord_x + offset, coord_y + offset),
-                                    (coord_x + 3 * offset, coord_y + offset), (coord_x + offset, coord_y + 3 * offset)))
+                if(not outline_only):
+                    pygame.draw.rect(self.screen,
+                                     getColorTuple(COLORS.get("TILE_" + TILES[val - 1])),
+                                     (coord_x, coord_y, self.grid_size, self.grid_size))
+                    pygame.draw.rect(self.screen,
+                                     getColorTuple(COLORS.get("BACKGROUND_BLACK")),
+                                     (coord_x, coord_y, self.grid_size, self.grid_size), 1)
+                    # Draw highlight triangle
+                    offset = int(self.grid_size / 10)
+                    pygame.draw.polygon(self.screen, getColorTuple(COLORS.get("TRIANGLE_GRAY")), ((coord_x + offset, coord_y + offset),
+                                        (coord_x + 3 * offset, coord_y + offset), (coord_x + offset, coord_y + 3 * offset)))
+                else:
+                    # Outline-only for prediction location
+                    pygame.draw.rect(self.screen,
+                                     getColorTuple(COLORS.get("TILE_" + TILES[val - 1])),
+                                     (coord_x + 1, coord_y + 1, self.grid_size - 2, self.grid_size - 2), 1)
                 
     def spawn_tile(self):
-        if not self.tile_bank:
-            self.generate_tile_bank()
-        self.tile = self.tile_bank.pop()
+        self.tile = self.tile_bank.pop(0)
         self.tile_shape = TILE_SHAPES.get(self.tile)[:]
         self.tile_x = int(GRID_COL_COUNT / 2 - len(self.tile_shape[0]) / 2)
         self.tile_y = 0
@@ -185,13 +197,22 @@ class TetrisGame:
         self.log("Spawning a new " + self.tile + " tile!")
         if self.check_collision(self.tile_shape, (self.tile_x, self.tile_y)):
             self.gameover = True
+            self.paused = True
+    
+    def get_next_tile(self):
+        if not self.tile_bank:
+            self.generate_tile_bank()
+        return self.tile_bank[0]
     
     # Drop the current tile by 1 grid
-    def drop(self):
+    def drop(self, instant=False):
         if not self.active or self.paused:
             return
         # Drop the tile
-        self.tile_y += 1
+        if instant:
+            self.tile_y = self.get_current_collision_offset()
+        else:            
+            self.tile_y += 1
         # If no collision happen, skip
         if not self.check_collision(self.tile_shape, (self.tile_x, self.tile_y)):
             return
@@ -246,6 +267,12 @@ class TetrisGame:
 
         self.log("Cleared " + str(score_count) + " rows with score " + str(total_score), "I")
         self.score += total_score
+    
+    def get_current_collision_offset(self):
+        offset_y = self.tile_y
+        while not self.check_collision(self.tile_shape, (self.tile_x, offset_y)):
+            offset_y += 1
+        return offset_y - 1
     
     def check_collision(self, tile_shape, offsets):
         for cy, row in enumerate(tile_shape):
