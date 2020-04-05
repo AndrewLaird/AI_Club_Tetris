@@ -6,8 +6,9 @@ from datetime import datetime
 
 # Configurations (USER)
 SIZE_SCALE = 1
-SPEED_DEFAULT = 1  # default speed
-SPEED_SCALE = 0.003  # scale to increase based on points
+SPEED_DEFAULT = 750  # 750 MS
+SPEED_SCALE_ENABLED = True  # game gets faster with more points?
+SPEED_SCALE = 1.5  # speed = max(50, 750 - SCORE * SPEED_SCALE)
 
 COLORS = {
     # Display
@@ -107,9 +108,8 @@ class TetrisGame:
         self.generate_tile_bank()
         self.spawn_tile()
         
-        # DQN Integration
+        # Score
         self.score = 0
-        self.score_last_screen = 0
     
     # Start the UI loop
     def start(self):
@@ -117,7 +117,7 @@ class TetrisGame:
         self.paused = False
         self.tick = 0
         
-        pygame.time.set_timer(pygame.USEREVENT + 1, 700)
+        pygame.time.set_timer(pygame.USEREVENT + 1, SPEED_DEFAULT if not SPEED_SCALE_ENABLED else int(max(50, SPEED_DEFAULT - self.score * SPEED_SCALE)))
         clock = pygame.time.Clock()
         
         while True:
