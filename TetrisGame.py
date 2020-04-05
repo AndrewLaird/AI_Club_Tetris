@@ -189,6 +189,8 @@ class TetrisGame:
                                      (coord_x + 1, coord_y + 1, self.grid_size - 2, self.grid_size - 2), 1)
                 
     def spawn_tile(self):
+        if not self.tile_bank:
+            self.generate_tile_bank() 
         self.tile = self.tile_bank.pop(0)
         self.tile_shape = TILE_SHAPES.get(self.tile)[:]
         self.tile_x = int(GRID_COL_COUNT / 2 - len(self.tile_shape[0]) / 2)
