@@ -40,8 +40,8 @@ from copy import copy, deepcopy
 # The configuration
 config = {
     'cell_size':    20,
-    'cols':        16,
-    'rows':        32,
+    'cols':        8,
+    'rows':        16,
     'delay':    750,
     'maxfps':    30
 }
@@ -205,10 +205,12 @@ class TetrisApp(object):
             if check_collision(self.board,
                        self.stone,
                        (self.stone_x, self.stone_y)):
+                
                 self.board = join_matrixes(
                   self.board,
                   self.stone,
                   (self.stone_x, self.stone_y))
+                
                 self.new_stone()
                 while True:
                     for i, row in enumerate(self.board[:-1]):
@@ -239,7 +241,7 @@ class TetrisApp(object):
             self.gameover = False
         return self.construct_state()
     
-    def run(self):
+    def start(self):
         key_actions = {
             'ESCAPE':    self.quit,
             'LEFT':     lambda:self.move(-1),
@@ -324,4 +326,4 @@ class TetrisApp(object):
 
 if __name__ == '__main__':
     App = TetrisApp()
-    App.run()
+    App.start()
