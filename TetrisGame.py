@@ -33,13 +33,13 @@ COLORS = {
 MESSAGES = {
     # Display
     "TITLE": "Tetris",
-    "CONTROLS": "Left/Right - Move tile\nUp - Rotate tile\nDown - Fast drop\nSpace - Insta-drop\nEscape - Play/Pause",
+    "CONTROLS": "Left/Right - Move tile\nUp - Rotate tile\nDown - Fast drop\nSpace - Insta-drop\nEscape - Play/Pause\nTab - Swap next tile",
     "SCORE": "Score: {score} (x{lines})",
     "SPEED": "Speed: {}ms",
-    "":"",
-    "":"",
-    "":"",
-    "":"",
+    "NEXT_TILE": "Next tile: {}",
+    "": "",
+    "": "",
+    "": "",
 }
 
 # Configurations (SYSTEM)
@@ -111,13 +111,15 @@ class TetrisGame:
         self.log("Tetris grid size calculated to: " + str(self.grid_size))
         
         # Keyboard integration
+        # http://thepythongamebook.com/en:glossary:p:pygame:keycodes
         self.key_actions = {
             "ESCAPE": self.toggle_pause,
             "LEFT": lambda: self.move_tile(-1),
             "RIGHT": lambda: self.move_tile(1),
             "DOWN": lambda: self.drop(False),
             "SPACE": lambda: self.drop(True),
-            "UP": self.rotate_tile
+            "UP": self.rotate_tile,
+            "TAB": self.swap_tile,
         }
         
         # Tile generation
@@ -186,30 +188,43 @@ class TetrisGame:
         #################
         # Coordinates calculations
         margin = 20  # 20 pixels margin
-        text_x_start = GRID_COL_COUNT * self.grid_size
+        text_x_start = GRID_COL_COUNT * self.grid_size + margin
         text_y_start = margin
 
         # Title
-        text_image = pygame.font.SysFont(FONT_NAME, 32).render(MESSAGES.get("TITLE") if not self.paused else "= PAUSED =", False, getColorTuple(COLORS.get("WHITE")))
-        self.screen.blit(text_image, (text_x_start + margin, text_y_start))
+        message = MESSAGES.get("TITLE")
+        if not self.active:
+            message = "Game Over"
+        elif self.paused:
+            message = "= PAUSED ="
+        text_image = pygame.font.SysFont(FONT_NAME, 32).render(message, False, getColorTuple(COLORS.get("WHITE")))
+        self.screen.blit(text_image, (text_x_start, text_y_start))
         text_y_start = 60
         
         # Controls
         for msg in MESSAGES.get("CONTROLS").split("\n"):
             text_image = pygame.font.SysFont(FONT_NAME, 16).render(msg, False, getColorTuple(COLORS.get("WHITE")))
-            self.screen.blit(text_image, (text_x_start + margin, text_y_start))
+            self.screen.blit(text_image, (text_x_start, text_y_start))
             text_y_start += 20
         text_y_start += 10
         
         # Score & speed
         text_image = pygame.font.SysFont(FONT_NAME, 16).render(MESSAGES.get("SCORE").format(score=self.score, lines=self.lines), False, getColorTuple(COLORS.get("WHITE")))
-        self.screen.blit(text_image, (text_x_start + margin, text_y_start))
+        self.screen.blit(text_image, (text_x_start, text_y_start))
         text_y_start += 20
         
         speed = SPEED_DEFAULT if not SPEED_SCALE_ENABLED else int(max(50, SPEED_DEFAULT - self.score * SPEED_SCALE))
         text_image = pygame.font.SysFont(FONT_NAME, 16).render(MESSAGES.get("SPEED").format(speed), False, getColorTuple(COLORS.get("WHITE")))
-        self.screen.blit(text_image, (text_x_start + margin, text_y_start))
+        self.screen.blit(text_image, (text_x_start, text_y_start))
         text_y_start += 20
+        
+        # Next tile
+        text_image = pygame.font.SysFont(FONT_NAME, 16).render(MESSAGES.get("NEXT_TILE").format(self.get_next_tile()), False, getColorTuple(COLORS.get("WHITE")))
+        self.screen.blit(text_image, (text_x_start, text_y_start))
+        text_y_start += 20
+        
+        self.draw_next_tile((text_x_start, text_y_start));
+        text_y_start += 60
         
         pygame.display.update()
     
@@ -238,7 +253,23 @@ class TetrisGame:
                     pygame.draw.rect(self.screen,
                                      getColorTuple(COLORS.get("TILE_" + TILES[val - 1])),
                                      (coord_x + 1, coord_y + 1, self.grid_size - 2, self.grid_size - 2), 1)
-                
+    
+    def draw_next_tile(self, offsets):
+        size = int(self.grid_size * 0.75)
+        for y, row in enumerate(TILE_SHAPES.get(self.get_next_tile())):
+            for x, val in enumerate(row):
+                if val == 0:
+                    continue
+                coord_x = offsets[0] + x * size
+                coord_y = offsets[1] + y * size
+                # Draw rectangle
+                pygame.draw.rect(self.screen, getColorTuple(COLORS.get("TILE_" + TILES[val - 1])), (coord_x, coord_y, size, size))
+                pygame.draw.rect(self.screen, getColorTuple(COLORS.get("BACKGROUND_BLACK")), (coord_x, coord_y, size, size), 1)
+                # Draw highlight triangle
+                offset = int(size / 10)
+                pygame.draw.polygon(self.screen, getColorTuple(COLORS.get("TRIANGLE_GRAY")), ((coord_x + offset, coord_y + offset),
+                                    (coord_x + 3 * offset, coord_y + offset), (coord_x + offset, coord_y + 3 * offset)))
+    
     def spawn_tile(self):
         self.tile = self.get_next_tile(pop=True)
         self.tile_shape = TILE_SHAPES.get(self.tile)[:]
@@ -247,7 +278,7 @@ class TetrisGame:
         
         self.log("Spawning a new " + self.tile + " tile!")
         if self.check_collision(self.tile_shape, (self.tile_x, self.tile_y)):
-            self.gameover = True
+            self.active = False
             self.paused = True
     
     def get_next_tile(self, pop=False):
@@ -291,6 +322,13 @@ class TetrisGame:
         if self.check_collision(new_shape, (self.tile_x, self.tile_y)):
             return
         self.tile_shape = new_shape
+        
+    def swap_tile(self):
+        tile = self.get_next_tile(True)
+        self.tile_bank.insert(0, self.tile)
+        
+        self.tile = tile
+        self.tile_shape = TILE_SHAPES.get(self.tile)[:]
         
     # Calculate score (called after every collision)
     def calculate_scores(self):
@@ -352,6 +390,10 @@ class TetrisGame:
         self.board = [[0] * GRID_COL_COUNT for _ in range(GRID_ROW_COUNT)]
     
     def toggle_pause(self):
+        if not self.active:
+            self.reset()
+            self.paused = False
+            return
         self.paused = not self.paused
 
     def quit(self):
