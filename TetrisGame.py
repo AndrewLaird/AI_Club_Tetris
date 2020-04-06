@@ -2,13 +2,15 @@
 import sys
 import random
 import pygame
+import copy
+import threading
 from datetime import datetime
 
 # Configurations (USER)
 SIZE_SCALE = 1
 SPEED_DEFAULT = 750  # 750 MS
 SPEED_SCALE_ENABLED = True  # game gets faster with more points?
-SPEED_SCALE = 1.5  # speed = max(50, 750 - SCORE * SPEED_SCALE)
+SPEED_SCALE = 0.05  # speed = max(50, 750 - SCORE * SPEED_SCALE)
 DISPLAY_PREDICTION = True
 
 FONT_NAME = "Consolas"
@@ -49,9 +51,20 @@ GRID_COL_COUNT = 10
 SCREEN_WIDTH = int(360 / 0.6 * SIZE_SCALE) 
 SCREEN_HEIGHT = int(720 * SIZE_SCALE)
 
-MAX_FPS = 60
+MAX_FPS = 30
 
-MULTI_SCORE_ALGORITHM = lambda a: 2 ** a;
+########################
+# Score Configurations #
+########################
+MULTI_SCORE_ALGORITHM = lambda lines_cleared: 5 ** lines_cleared;
+PER_STEP_SCORE_GAIN = 0.5
+
+######################
+# STEP Configuration #
+######################
+ALWAYS_DRAW = False
+STEP_ACTION = False
+STEP_DEBUG = False
 
 TILES = ["LINE", "L", "L_REVERSED", "S", "S_REVERSED", "T", "CUBE"]
 TILE_SHAPES = {
@@ -119,7 +132,7 @@ class TetrisGame:
             "DOWN": lambda: self.drop(False),
             "SPACE": lambda: self.drop(True),
             "UP": self.rotate_tile,
-            "TAB": self.swap_tile,
+            "TAB": self.swap_tile
         }
         
         # Tile generation
@@ -134,18 +147,46 @@ class TetrisGame:
     def start(self):
         self.active = True
         self.paused = False
-        self.tick = 0
         
         pygame.time.set_timer(pygame.USEREVENT + 1, SPEED_DEFAULT if not SPEED_SCALE_ENABLED else int(max(50, SPEED_DEFAULT - self.score * SPEED_SCALE)))
         clock = pygame.time.Clock()
         
-        while True:
-            self.update(clock)
-            self.draw()
-            self.tick += 1
+        def loop():
+            while True:
+                # Game control: step or auto?
+                if(STEP_ACTION):
+                    # Command-line debugging
+                    if STEP_DEBUG:
+                        cmd = input("Command:")
+                        if cmd == "q":
+                            break
+                        elif cmd == "d":
+                            self.render()
+                        elif cmd == "p":
+                            self.print_board()
+                        else:
+                            try:
+                                cmd = int(cmd)
+                            except:
+                                continue
+                            self.step(cmd)
+                else:
+                    # Auto
+                    self.update()
+                # Drawing of the UI
+                if not STEP_ACTION or ALWAYS_DRAW:
+                    self.draw()
+                clock.tick(MAX_FPS)
+
+        # Use multi-threading?
+        if STEP_ACTION and not STEP_DEBUG:
+            th = threading.Thread(target=loop, daemon=False)
+            th.start()
+        else:
+            loop()
 
     # Called every tick
-    def update(self, clock):
+    def update(self):
         for event in pygame.event.get():
             if event.type == pygame.USEREVENT + 1:
                 self.drop()
@@ -156,8 +197,6 @@ class TetrisGame:
                     if event.key == eval("pygame.K_" + key):
                         self.key_actions[key]()
             
-        clock.tick(MAX_FPS)
-    
     # Called every tick after update
     def draw(self):
         # Background layer
@@ -180,8 +219,6 @@ class TetrisGame:
             self.draw_tiles(self.tile_shape, (self.tile_x, self.get_current_collision_offset()), True)
         # Draw current tile
         self.draw_tiles(self.tile_shape, (self.tile_x, self.tile_y))
-
-#         self.draw_tiles(TILE_SHAPES.get(self.get_next_tile()), (self.tile_x, 0), True)
 
         #################
         # Message Board #
@@ -292,9 +329,13 @@ class TetrisGame:
             return
         # Drop the tile
         if instant:
-            self.tile_y = self.get_current_collision_offset()
+            destination = self.get_current_collision_offset()
+            self.score += PER_STEP_SCORE_GAIN * (destination - self.tile_y)
+            self.tile_y = destination
         else:            
             self.tile_y += 1
+            self.score += PER_STEP_SCORE_GAIN
+        
         # If no collision happen, skip
         if not self.check_collision(self.tile_shape, (self.tile_x, self.tile_y)):
             return
@@ -419,8 +460,51 @@ class TetrisGame:
     # Template: on_score_changed(original_score, new_score)
     def subscribe_on_score_changed(self, callback):
         self.on_score_changed_callbacks.append(callback)
+    
+    def get_board(self):
+        return self.board
+    
+    def render(self):
+        self.draw()
+    
+    # Action = index of { NOTHING, L, R, 2L, 2R, ROTATE, SWAP, FAST_FALL }
+    def step(self, action=0):
+        # Update UI
+        pygame.event.get()
+        # Obtain previous score
+        previous_score = self.score
+        # Move action
+        if action in [1, 2, 3, 4]:
+            self.move_tile((-1 if action in [1, 3] else 1) * (1 if action in [1, 2] else 2))
+        # Rotate
+        elif action == 5:
+            self.rotate_tile()
+        # Swap
+        elif action == 6:
+            self.swap_tile()
+        # Fast fall
+        elif action == 7:
+            self.drop()
+        
+        # Continue by 1 step
+        self.drop()
+        
+        # >> Returns: board matrix, previous_score change, is-game-over, next piece
+        return copy.deepcopy(self.board), self.score - previous_score, self.active, self.get_next_tile()
 
 
 if __name__ == "__main__":
     print("Hello world!")
-    TetrisGame()
+    game = TetrisGame()
+    games = 0
+    if STEP_ACTION and not STEP_DEBUG:
+        while True:
+            # if random.randrange(10000) == 0:
+            #    game.draw()
+            if game.active:
+                game.step()
+            else:
+                game.reset()
+                games += 1
+                print(games)
+    print("Goodbye world!")
