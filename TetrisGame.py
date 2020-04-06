@@ -11,6 +11,8 @@ SPEED_SCALE_ENABLED = True  # game gets faster with more points?
 SPEED_SCALE = 1.5  # speed = max(50, 750 - SCORE * SPEED_SCALE)
 DISPLAY_PREDICTION = True
 
+FONT_NAME = "Consolas"
+
 COLORS = {
     # Display
     "BACKGROUND_BLACK": "000000",
@@ -26,6 +28,18 @@ COLORS = {
     "TILE_S_REVERSED": "11c5bf",
     "TILE_T": "ae81ff",
     "TILE_CUBE": "e94659"
+}
+
+MESSAGES = {
+    # Display
+    "TITLE": "Tetris",
+    "CONTROLS": "Left/Right - Move tile\nUp - Rotate tile\nDown - Fast drop\nSpace - Insta-drop\nEscape - Play/Pause",
+    "SCORE": "Score: {score} (x{lines})",
+    "SPEED": "Speed: {}ms",
+    "":"",
+    "":"",
+    "":"",
+    "":"",
 }
 
 # Configurations (SYSTEM)
@@ -67,6 +81,7 @@ class TetrisGame:
     def __init__(self):
         self.log("Initializing system...")
         pygame.init()
+        pygame.font.init()
         
         self.screen = pygame.display.set_mode(size=(SCREEN_WIDTH, SCREEN_HEIGHT))
         self.log("Screen size set to: (" + str(SCREEN_WIDTH) + ", " + str(SCREEN_HEIGHT) + ")")
@@ -111,6 +126,7 @@ class TetrisGame:
         
         # Score
         self.score = 0
+        self.lines = 0
     
     # Start the UI loop
     def start(self):
@@ -144,6 +160,11 @@ class TetrisGame:
     def draw(self):
         # Background layer
         self.screen.fill(getColorTuple(COLORS.get("BACKGROUND_BLACK")))
+        
+        ################
+        # Tetris Board #
+        ################
+        
         # Layered background layer
         for a in range(GRID_COL_COUNT):
             color = getColorTuple(COLORS.get("BACKGROUND_DARK" if a % 2 == 0 else "BACKGROUND_LIGHT"))
@@ -160,6 +181,36 @@ class TetrisGame:
 
 #         self.draw_tiles(TILE_SHAPES.get(self.get_next_tile()), (self.tile_x, 0), True)
 
+        #################
+        # Message Board #
+        #################
+        # Coordinates calculations
+        margin = 20  # 20 pixels margin
+        text_x_start = GRID_COL_COUNT * self.grid_size
+        text_y_start = margin
+
+        # Title
+        text_image = pygame.font.SysFont(FONT_NAME, 32).render(MESSAGES.get("TITLE") if not self.paused else "= PAUSED =", False, getColorTuple(COLORS.get("WHITE")))
+        self.screen.blit(text_image, (text_x_start + margin, text_y_start))
+        text_y_start = 60
+        
+        # Controls
+        for msg in MESSAGES.get("CONTROLS").split("\n"):
+            text_image = pygame.font.SysFont(FONT_NAME, 16).render(msg, False, getColorTuple(COLORS.get("WHITE")))
+            self.screen.blit(text_image, (text_x_start + margin, text_y_start))
+            text_y_start += 20
+        text_y_start += 10
+        
+        # Score & speed
+        text_image = pygame.font.SysFont(FONT_NAME, 16).render(MESSAGES.get("SCORE").format(score=self.score, lines=self.lines), False, getColorTuple(COLORS.get("WHITE")))
+        self.screen.blit(text_image, (text_x_start + margin, text_y_start))
+        text_y_start += 20
+        
+        speed = SPEED_DEFAULT if not SPEED_SCALE_ENABLED else int(max(50, SPEED_DEFAULT - self.score * SPEED_SCALE))
+        text_image = pygame.font.SysFont(FONT_NAME, 16).render(MESSAGES.get("SPEED").format(speed), False, getColorTuple(COLORS.get("WHITE")))
+        self.screen.blit(text_image, (text_x_start + margin, text_y_start))
+        text_y_start += 20
+        
         pygame.display.update()
     
     # Draw the tetris tiles
@@ -189,9 +240,7 @@ class TetrisGame:
                                      (coord_x + 1, coord_y + 1, self.grid_size - 2, self.grid_size - 2), 1)
                 
     def spawn_tile(self):
-        if not self.tile_bank:
-            self.generate_tile_bank() 
-        self.tile = self.tile_bank.pop(0)
+        self.tile = self.get_next_tile(pop=True)
         self.tile_shape = TILE_SHAPES.get(self.tile)[:]
         self.tile_x = int(GRID_COL_COUNT / 2 - len(self.tile_shape[0]) / 2)
         self.tile_y = 0
@@ -201,10 +250,10 @@ class TetrisGame:
             self.gameover = True
             self.paused = True
     
-    def get_next_tile(self):
+    def get_next_tile(self, pop=False):
         if not self.tile_bank:
             self.generate_tile_bank()
-        return self.tile_bank[0]
+        return self.tile_bank[0] if not pop else self.tile_bank.pop(0)
     
     # Drop the current tile by 1 grid
     def drop(self, instant=False):
@@ -267,8 +316,9 @@ class TetrisGame:
         for callback in self.on_score_changed_callbacks:
             callback(self.score, self.score + total_score)
 
-        self.log("Cleared " + str(score_count) + " rows with score " + str(total_score), "I")
         self.score += total_score
+        self.lines += score_count
+        self.log("Cleared " + str(score_count) + " rows with score " + str(total_score), "I")
     
     def get_current_collision_offset(self):
         offset_y = self.tile_y
@@ -320,7 +370,10 @@ class TetrisGame:
         current_time = datetime.now().strftime("%H:%M:%S:%f")[:-3]
         print("[" + level + "] " + current_time + " >> " + message)
     
-    # Integration with neural networks
+    ################################################
+    # Integration with neural networks (Interface) #
+    ################################################
+    # On-score-changed event handler
     # Template: on_score_changed(original_score, new_score)
     def subscribe_on_score_changed(self, callback):
         self.on_score_changed_callbacks.append(callback)
