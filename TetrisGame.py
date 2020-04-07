@@ -446,7 +446,7 @@ class TetrisGame:
     
     def print_board(self):
         self.log("Printing debug board")
-        for i, row in enumerate(self.board):
+        for i, row in enumerate(self.get_board_with_current_tile()):
             print("{:02d}".format(i), row)
     
     def log(self, message, level="D"):
@@ -461,8 +461,14 @@ class TetrisGame:
     def subscribe_on_score_changed(self, callback):
         self.on_score_changed_callbacks.append(callback)
     
-    def get_board(self):
-        return self.board
+    def get_board_with_current_tile(self):
+        board = copy.deepcopy(self.board)
+        for y, row in enumerate(self.tile_shape):
+            for x, val in enumerate(row):
+                if val == 0:
+                    continue
+                board[y + self.tile_y][x + self.tile_x] = val
+        return board
     
     def render(self):
         self.draw()
@@ -490,7 +496,7 @@ class TetrisGame:
         self.drop()
         
         # >> Returns: board matrix, previous_score change, is-game-over, next piece
-        return copy.deepcopy(self.board), self.score - previous_score, self.active, self.get_next_tile()
+        return self.get_board_with_current_tile(), self.score - previous_score, self.active, self.get_next_tile()
 
 
 if __name__ == "__main__":
