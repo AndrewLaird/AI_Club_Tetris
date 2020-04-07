@@ -361,17 +361,28 @@ class TetrisGame:
         if not self.active or self.paused:
             return
         new_shape = list(zip(*reversed(self.tile_shape)))
+        temp_x = self.tile_x
+        # Out of range detection
+        if self.tile_x + len(new_shape[0]) > GRID_COL_COUNT:
+            temp_x = GRID_COL_COUNT - len(new_shape[0])        
         # If collide, disallow rotation
-        if self.check_collision(new_shape, (self.tile_x, self.tile_y)):
+        if self.check_collision(new_shape, (temp_x, self.tile_y)):
             return
+        self.tile_x = temp_x
         self.tile_shape = new_shape
         
     def swap_tile(self):
+        if not self.active or self.paused:
+            return
         tile = self.get_next_tile(True)
         self.tile_bank.insert(0, self.tile)
         
         self.tile = tile
         self.tile_shape = TILE_SHAPES.get(self.tile)[:]
+        
+        # Out of range detection
+        if self.tile_x + len(self.tile_shape[0]) > GRID_COL_COUNT:
+            self.tile_x = GRID_COL_COUNT - len(self.tile_shape[0])
         
     # Calculate score (called after every collision)
     def calculate_scores(self):
