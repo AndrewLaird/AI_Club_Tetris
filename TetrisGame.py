@@ -12,6 +12,7 @@ SPEED_DEFAULT = 750  # 750 MS
 SPEED_SCALE_ENABLED = True  # game gets faster with more points?
 SPEED_SCALE = 0.05  # speed = max(50, 750 - SCORE * SPEED_SCALE)
 DISPLAY_PREDICTION = True
+HAS_DISPLAY = False
 
 FONT_NAME = "Consolas"
 
@@ -92,25 +93,26 @@ def getColorTuple(colorHex):
 class TetrisGame:
     
     def __init__(self):
-        self.log("Initializing system...")
-        pygame.init()
-        pygame.font.init()
-        
-        self.screen = pygame.display.set_mode(size=(SCREEN_WIDTH, SCREEN_HEIGHT))
-        self.log("Screen size set to: (" + str(SCREEN_WIDTH) + ", " + str(SCREEN_HEIGHT) + ")")
+        if(HAS_DISPLAY):
+            self.log("Initializing system...")
+            pygame.init()
+            pygame.font.init()
+            
+            self.screen = pygame.display.set_mode(size=(SCREEN_WIDTH, SCREEN_HEIGHT))
+            self.log("Screen size set to: (" + str(SCREEN_WIDTH) + ", " + str(SCREEN_HEIGHT) + ")")
 
-        # PyGame configurations
-        pygame.event.set_blocked(pygame.MOUSEMOTION)
-        
-        # Initialize game-related attributes
-        self.init_game()
-        
-        # Setup callback functions
-        self.on_score_changed_callbacks = []
-        
-        # Start the game
-        self.start()
-        
+            # PyGame configurations
+            pygame.event.set_blocked(pygame.MOUSEMOTION)
+            
+            # Initialize game-related attributes
+            self.init_game()
+            
+            # Setup callback functions
+            self.on_score_changed_callbacks = []
+            
+            # Start the game
+            self.start()
+            
     def init_game(self):
         self.log("Initializing game...")
         self.active = True
@@ -476,7 +478,8 @@ class TetrisGame:
     # Action = index of { NOTHING, L, R, 2L, 2R, ROTATE, SWAP, FAST_FALL }
     def step(self, action=0):
         # Update UI
-        pygame.event.get()
+        if(HAS_DISPLAY):
+            pygame.event.get()
         # Obtain previous score
         previous_score = self.score
         # Move action

@@ -1,4 +1,4 @@
-import tetris_game
+import TetrisGame
 import random
 import time
 from Agent import DQN_Agent
@@ -6,14 +6,16 @@ from Agent import DQN_Agent
 
 def run_game(game,agent,render):
     done = False
-    obs = game.start_game()
+    obs = game.reset()
     total_reward = 0
     experience = []
     last_obs = obs
     
     while(not done):
         action = agent.predict(obs)
-        obs,reward,done = game.step(action,render=render)
+        obs,reward,done,next_block = game.step(action)
+        next_block = TetrisGame.blocks.index(next_block)
+        print(next_block)
         total_reward += reward
         experience.append([last_obs,action,obs,reward,done])
         last_obs = obs
@@ -29,12 +31,12 @@ class RandomAgent():
         return random.randint(0,3)
 
 if __name__ == "__main__":
-    game = tetris_game.TetrisApp()
+    game = TetrisGame.TetrisGame()
     agent = RandomAgent()
     better_agent = DQN_Agent()
     while(True):
         for i in range(100):
-            experience = run_game(game,better_agent,render=True)
+            experience = run_game(game,agent,render=True)
             #if(experience != -1):
                 #something to be gained
             better_agent.take_in_data(experience)
