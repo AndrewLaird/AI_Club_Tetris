@@ -18,8 +18,6 @@ def run_game(game,agent,render):
         experience.append([last_obs,action,obs,reward,done])
         last_obs = obs
     print("total reward",total_reward)
-    if(total_reward == 0):
-        return -1
     return experience
 
 
@@ -36,10 +34,10 @@ if __name__ == "__main__":
     better_agent = DQN_Agent()
     while(True):
         for i in range(100):
-            experience = run_game(game,better_agent,render=i==99)
-            if(experience != -1):
+            experience = run_game(game,better_agent,render=True)
+            #if(experience != -1):
                 #something to be gained
-                better_agent.take_in_data(experience)
+            better_agent.take_in_data(experience)
         better_agent.train()
 
 

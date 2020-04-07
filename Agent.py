@@ -64,7 +64,15 @@ class DQN_Agent():
             if(done[i]):
                 current_reward = 0 
             else:
-                backed_up_reward[i] = reward[i] + self.gamma*backed_up_reward[i+1] - .01
+                backed_up_reward[i] = reward[i] + self.gamma*backed_up_reward[i+1] + .01
+        
+        # now add to the backed_up_reward the term for discounted gamma*max_a(Q(s',a))
+        # definitely vectorize this
+        # TODO
+        for i in range(len(backed_up_reward)):
+            if(len(obs[i]) != 0 and not done[i]):
+                max_action = self.training_predict(obs[i])
+                backed_up_reward[i] += self.gamma*max_action
 
         self.add_to_data(zip(obs,action,backed_up_reward,done))
 
@@ -76,6 +84,15 @@ class DQN_Agent():
         print(x_train.shape)
         y_train = np.array(reward)
         self.model.fit(x_train,y_train,epochs=5)
+
+    def training_predict(self,obs):
+        # no randomness
+        # and we return the magnitude of the value not just which one was max
+        obs = np.array([np.array(obs).flatten()])
+        answer = self.model.predict(obs)[0]
+        largest_index = np.argmax(answer)
+        return answer[largest_index]
+
 
     def predict(self,obs):
         if(random.random() < self.prob_random):
