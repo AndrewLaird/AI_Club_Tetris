@@ -111,11 +111,11 @@ class TetrisGame:
             # Setup callback functions
             self.on_score_changed_callbacks = []
             
-            # High-score
-            self.high_score = 0
-            
             # Start the game
             self.start()
+        # High-score
+        self.high_score = 0
+        self.score = 0
             
     def init_game(self):
         self.log("Initializing game...")
@@ -524,7 +524,7 @@ class TetrisGame:
         self.drop()
         
         # >> Returns: board matrix, previous_score change, is-game-over, next piece
-        return self.get_board_with_current_tile(), self.score - previous_score, self.active, self.get_next_tile()
+        return self.get_board_with_current_tile(), self.score - previous_score, not self.active, self.get_next_tile()
 
 
 if __name__ == "__main__":

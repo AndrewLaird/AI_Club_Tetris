@@ -14,8 +14,8 @@ def run_game(game,agent,render):
     while(not done):
         action = agent.predict(obs)
         obs,reward,done,next_block = game.step(action)
-        next_block = TetrisGame.blocks.index(next_block)
-        print(next_block)
+        next_block = TetrisGame.TILES.index(next_block)
+        # print(next_block)
         total_reward += reward
         experience.append([last_obs,action,obs,reward,done])
         last_obs = obs
