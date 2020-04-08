@@ -38,6 +38,7 @@ MESSAGES = {
     "TITLE": "Tetris",
     "CONTROLS": "Left/Right - Move tile\nUp - Rotate tile\nDown - Fast drop\nSpace - Insta-drop\nEscape - Play/Pause\nTab - Swap next tile",
     "SCORE": "Score: {score} (x{lines})",
+    "HIGH_SCORE": "High Score: {}",
     "SPEED": "Speed: {}ms",
     "NEXT_TILE": "Next tile: {}",
     "": "",
@@ -109,6 +110,9 @@ class TetrisGame:
             
             # Setup callback functions
             self.on_score_changed_callbacks = []
+            
+            # High-score
+            self.high_score = 0
             
             # Start the game
             self.start()
@@ -247,11 +251,17 @@ class TetrisGame:
             text_y_start += 20
         text_y_start += 10
         
-        # Score & speed
+        # Score
         text_image = pygame.font.SysFont(FONT_NAME, 16).render(MESSAGES.get("SCORE").format(score=self.score, lines=self.lines), False, getColorTuple(COLORS.get("WHITE")))
         self.screen.blit(text_image, (text_x_start, text_y_start))
         text_y_start += 20
         
+        # High Score
+        text_image = pygame.font.SysFont(FONT_NAME, 16).render(MESSAGES.get("HIGH_SCORE").format(self.score if self.score > self.high_score else self.high_score), False, getColorTuple(COLORS.get("WHITE")))
+        self.screen.blit(text_image, (text_x_start, text_y_start))
+        text_y_start += 20
+
+        # Speed        
         speed = SPEED_DEFAULT if not SPEED_SCALE_ENABLED else int(max(50, SPEED_DEFAULT - self.score * SPEED_SCALE))
         text_image = pygame.font.SysFont(FONT_NAME, 16).render(MESSAGES.get("SPEED").format(speed), False, getColorTuple(COLORS.get("WHITE")))
         self.screen.blit(text_image, (text_x_start, text_y_start))
@@ -438,6 +448,10 @@ class TetrisGame:
                 self.board[cy + self.tile_y - 1][cx + self.tile_x] = val
     
     def reset(self):
+        # Calculate high score
+        if self.high_score < self.score:
+            self.high_score = self.score
+        # Reset
         self.init_game()
     
     def reset_board(self):
