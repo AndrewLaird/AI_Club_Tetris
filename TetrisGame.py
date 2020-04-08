@@ -12,7 +12,8 @@ SPEED_DEFAULT = 750  # 750 MS
 SPEED_SCALE_ENABLED = True  # game gets faster with more points?
 SPEED_SCALE = 0.05  # speed = max(50, 750 - SCORE * SPEED_SCALE)
 DISPLAY_PREDICTION = True
-HAS_DISPLAY = False
+HAS_DISPLAY = True
+DEBUG_ENABLED = True
 
 FONT_NAME = "Consolas"
 
@@ -41,9 +42,6 @@ MESSAGES = {
     "HIGH_SCORE": "High Score: {}",
     "SPEED": "Speed: {}ms",
     "NEXT_TILE": "Next tile: {}",
-    "": "",
-    "": "",
-    "": "",
 }
 
 # Configurations (SYSTEM)
@@ -52,7 +50,6 @@ GRID_COL_COUNT = 10
 
 SCREEN_WIDTH = int(360 / 0.6 * SIZE_SCALE) 
 SCREEN_HEIGHT = int(720 * SIZE_SCALE)
-
 MAX_FPS = 30
 
 ########################
@@ -94,7 +91,7 @@ def getColorTuple(colorHex):
 class TetrisGame:
     
     def __init__(self):
-        if(HAS_DISPLAY):
+        if HAS_DISPLAY:
             self.log("Initializing system...")
             pygame.init()
             pygame.font.init()
@@ -111,11 +108,13 @@ class TetrisGame:
             # Setup callback functions
             self.on_score_changed_callbacks = []
             
-            # Start the game
-            self.start()
         # High-score
         self.high_score = 0
         self.score = 0
+        
+        if HAS_DISPLAY:
+            # Start the game
+            self.start()
             
     def init_game(self):
         self.log("Initializing game...")
@@ -448,6 +447,7 @@ class TetrisGame:
                 self.board[cy + self.tile_y - 1][cx + self.tile_x] = val
     
     def reset(self):
+        self.log("Resetting game...")
         # Calculate high score
         if self.high_score < self.score:
             self.high_score = self.score
@@ -463,6 +463,7 @@ class TetrisGame:
             self.paused = False
             return
         self.paused = not self.paused
+        self.log(("Pausing" if self.paused else "Resuming") + " game...")
 
     def quit(self):
         sys.exit()
@@ -477,6 +478,8 @@ class TetrisGame:
             print("{:02d}".format(i), row)
     
     def log(self, message, level="D"):
+        if not DEBUG_ENABLED:
+            return
         current_time = datetime.now().strftime("%H:%M:%S:%f")[:-3]
         print("[" + level + "] " + current_time + " >> " + message)
     
@@ -523,7 +526,7 @@ class TetrisGame:
         # Continue by 1 step
         self.drop()
         
-        # >> Returns: board matrix, previous_score change, is-game-over, next piece
+        # >> Returns: board matrix, score change, is-game-over, next piece
         return self.get_board_with_current_tile(), self.score - previous_score, not self.active, self.get_next_tile()
 
 
