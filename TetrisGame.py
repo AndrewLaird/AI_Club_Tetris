@@ -12,7 +12,7 @@ SPEED_DEFAULT = 750  # 750 MS
 SPEED_SCALE_ENABLED = True  # game gets faster with more points?
 SPEED_SCALE = 0.05  # speed = max(50, 750 - SCORE * SPEED_SCALE)
 DISPLAY_PREDICTION = True
-HAS_DISPLAY = True
+HAS_DISPLAY = False
 DEBUG_ENABLED = True
 
 FONT_NAME = "Consolas"
@@ -420,6 +420,8 @@ class TetrisGame:
         self.score += total_score
         self.lines += score_count
         self.log("Cleared " + str(score_count) + " rows with score " + str(total_score), "I")
+        pygame.time.set_timer(pygame.USEREVENT + 1, SPEED_DEFAULT if not SPEED_SCALE_ENABLED else int(max(50, SPEED_DEFAULT - self.score * SPEED_SCALE)))
+
     
     def get_current_collision_offset(self):
         offset_y = self.tile_y
@@ -531,6 +533,7 @@ class TetrisGame:
 
 
 if __name__ == "__main__":
+    HAS_DISPLAY = True
     print("Hello world!")
     game = TetrisGame()
     games = 0
