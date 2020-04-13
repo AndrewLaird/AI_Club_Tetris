@@ -55,7 +55,7 @@ MAX_FPS = 30
 ########################
 # Score Configurations #
 ########################
-MULTI_SCORE_ALGORITHM = lambda lines_cleared: 5 ** lines_cleared;
+MULTI_SCORE_ALGORITHM = lambda lines_cleared: 150 ** lines_cleared
 PER_STEP_SCORE_GAIN = 0.5
 
 ######################
@@ -63,7 +63,7 @@ PER_STEP_SCORE_GAIN = 0.5
 ######################
 ALWAYS_DRAW = True
 STEP_ACTION = True
-STEP_DEBUG = False
+STEP_DEBUG = True
 
 TILES = ["LINE", "L", "L_REVERSED", "S", "S_REVERSED", "T", "CUBE"]
 TILE_SHAPES = {
@@ -98,7 +98,7 @@ class TetrisGame:
 
             self.screen = pygame.display.set_mode(size=(SCREEN_WIDTH, SCREEN_HEIGHT))
             self.log("Screen size set to: (" + str(SCREEN_WIDTH) + ", " + str(SCREEN_HEIGHT) + ")", 2)
-            self.obs_size = GRID_ROW_COUNT*GRID_COL_COUNT # would be + 1 if you are using the next block
+            self.obs_size = GRID_ROW_COUNT * GRID_COL_COUNT  # would be + 1 if you are using the next block
 
             # PyGame configurations
             pygame.event.set_blocked(pygame.MOUSEMOTION)
@@ -161,7 +161,7 @@ class TetrisGame:
         def loop():
             while True:
                 # Game control: step or auto?
-                if (STEP_ACTION):
+                if STEP_ACTION:
                     # Command-line debugging
                     if STEP_DEBUG:
                         cmd = input("Command:")
@@ -170,7 +170,7 @@ class TetrisGame:
                         elif cmd == "d":
                             self.render()
                         elif cmd == "p":
-                            self.print_board()
+                            self.print_board(True)
                         else:
                             try:
                                 cmd = int(cmd)
@@ -212,7 +212,6 @@ class TetrisGame:
         ################
         # Tetris Board #
         ################
-
         # Layered background layer
         for a in range(GRID_COL_COUNT):
             color = getColorTuple(COLORS.get("BACKGROUND_DARK" if a % 2 == 0 else "BACKGROUND_LIGHT"))
@@ -279,7 +278,7 @@ class TetrisGame:
         self.screen.blit(text_image, (text_x_start, text_y_start))
         text_y_start += 20
 
-        self.draw_next_tile((text_x_start, text_y_start));
+        self.draw_next_tile((text_x_start, text_y_start))
         text_y_start += 60
 
         pygame.display.update()
@@ -293,7 +292,7 @@ class TetrisGame:
                 coord_x = (offsets[0] + x) * self.grid_size
                 coord_y = (offsets[1] + y) * self.grid_size
                 # Draw rectangle
-                if (not outline_only):
+                if not outline_only:
                     pygame.draw.rect(self.screen,
                                      getColorTuple(COLORS.get("TILE_" + TILES[val - 1])),
                                      (coord_x, coord_y, self.grid_size, self.grid_size))
@@ -489,9 +488,9 @@ class TetrisGame:
         self.tile_bank = list(TILE_SHAPES.keys())
         random.shuffle(self.tile_bank)
 
-    def print_board(self):
+    def print_board(self, flattened=False):
         self.log("Printing debug board", 10)
-        for i, row in enumerate(self.get_board_with_current_tile()):
+        for i, row in enumerate(self.get_board_with_current_tile(flattened=flattened)):
             print("{:02d}".format(i), row)
 
     def log(self, message, level):
@@ -508,19 +507,22 @@ class TetrisGame:
     def subscribe_on_score_changed(self, callback):
         self.on_score_changed_callbacks.append(callback)
 
-    def get_board_with_current_tile(self):
+    def get_board_with_current_tile(self, flattened=False):
         board = copy.deepcopy(self.board)
+        # If flatten, change all numbers to 0/1
+        if flattened:
+            board = [[int(bool(val)) for val in row] for row in board]
+        # Add current tile (do not flatten)
         for y, row in enumerate(self.tile_shape):
             for x, val in enumerate(row):
-                if val == 0:
-                    continue
-                board[y + self.tile_y][x + self.tile_x] = val
+                if val != 0:
+                    board[y + self.tile_y][x + self.tile_x] = val
         return board
 
     def render(self):
         self.draw()
 
-    # Action = index of { NOTHING, L, R, 2L, 2R, ROTATE, SWAP, FAST_FALL }
+    # Action = index of { NOTHING, L, R, 2L, 2R, ROTATE, SWAP, FAST_FALL } # 8 INSTA_FALL } # 9
     def step(self, action=0):
         # Update UI
         if HAS_DISPLAY:
@@ -536,9 +538,9 @@ class TetrisGame:
         # Swap
         elif action == 6:
             self.swap_tile()
-        # Fast fall
-        elif action == 7:
-            self.drop()
+        # Fast fall / Insta-fall
+        elif action in [7, 8]:
+            self.drop(instant=action == 8)
 
         # Continue by 1 step
         self.drop()
