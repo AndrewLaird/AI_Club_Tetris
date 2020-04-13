@@ -8,6 +8,9 @@ from tensorflow.keras import Sequential
 import numpy as np
 import random
 
+device = "CPU" if tf.test.gpu_device_name() == "" else "GPU"
+print(device)
+
 
 # possible outputs 
 # move left, move right, rotate, do nothing
@@ -79,11 +82,12 @@ class DQN_Agent():
     def train(self):
         # this should be fun
         # we want our network to predict the rewards given that input
-        obs,action,reward,done = zip(*self.data)
-        x_train = np.array([np.array(x).flatten() for x  in obs])
-        print(x_train.shape)
-        y_train = np.array(reward)
-        self.model.fit(x_train,y_train,epochs=5)
+        with tf.device(device):
+            obs,action,reward,done = zip(*self.data)
+            x_train = np.array([np.array(x).flatten() for x  in obs])
+            print(x_train.shape)
+            y_train = np.array(reward)
+            self.model.fit(x_train,y_train,epochs=5)
 
     def training_predict(self,obs):
         # no randomness
@@ -108,10 +112,3 @@ class DQN_Agent():
         
 
 
-
-class DQN_model():
-    pass
-
-
-if __name__ == "__main__":
-    game = tetris_game.TetrisApp()
