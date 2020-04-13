@@ -98,6 +98,7 @@ class TetrisGame:
 
             self.screen = pygame.display.set_mode(size=(SCREEN_WIDTH, SCREEN_HEIGHT))
             self.log("Screen size set to: (" + str(SCREEN_WIDTH) + ", " + str(SCREEN_HEIGHT) + ")", 2)
+            self.obs_size = GRID_ROW_COUNT*GRID_COL_COUNT # would be + 1 if you are using the next block
 
             # PyGame configurations
             pygame.event.set_blocked(pygame.MOUSEMOTION)

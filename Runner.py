@@ -1,7 +1,7 @@
 import TetrisGame
 import random
 import time
-from Agent import DQN_Agent
+from Pytorch_Agent import DQN_Agent
 
 
 def run_game(game,agent,render):
@@ -33,14 +33,14 @@ class RandomAgent():
 if __name__ == "__main__":
     game = TetrisGame.TetrisGame()
     agent = RandomAgent()
-    better_agent = DQN_Agent()
+    dqn_agent = DQN_Agent(game.obs_size)
     while(True):
-        for i in range(100):
-            experience = run_game(game,agent,render=True)
+        for i in range(25):
+            experience = run_game(game,dqn_agent,render=True)
             #if(experience != -1):
                 #something to be gained
-            better_agent.take_in_data(experience)
-        better_agent.train()
+            dqn_agent.take_in_data(experience)
+        dqn_agent.train()
 
 
 

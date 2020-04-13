@@ -1,15 +1,13 @@
-# using DQN to play tetris
-
+#t using DQN to play tetris
+# This coursera course was a great example that I used to 
+# implement this agent: https://github.com/udacity/deep-reinforcement-learning/blob/master/dqn/solution/dqn_agent.py
 # state = board given by
 from copy import copy , deepcopy
 import tensorflow as tf
 from tensorflow.keras import layers
 from tensorflow.keras import Sequential
 import numpy as np
-import random
-
-device = "CPU" if tf.test.gpu_device_name() == "" else "GPU"
-print(device)
+import random device = "CPU" if tf.test.gpu_device_name() == "" else "GPU" print(device)
 
 
 # possible outputs 
@@ -52,48 +50,67 @@ class DQN_Agent():
         
 
     def take_in_data(self,data):
-        # we have to take in this data and backup the rewards correctly
-        # assuming we haven't shuffled the data yet
-        # so backup the reward between 1's going backward
-        # lets do it by backing up any reward with discount
-        
-        # oh I think we have a dp problem
-        # we want rt + yrt+1 + y^2rt+2 ...
-        # which recursively is g(t) = rt + y*g(t+1)
-        obs,action,new_obs,reward,done = zip(*data)
-        backed_up_reward = [0 for x in range(len(reward))]
-        current_reward = 0
-        for i in range(len(reward)-2,0,-1):
-            if(done[i]):
-                current_reward = 0 
-            else:
-                backed_up_reward[i] = reward[i] + self.gamma*backed_up_reward[i+1] + .01
-        
-        # now add to the backed_up_reward the term for discounted gamma*max_a(Q(s',a))
-        # definitely vectorize this
-        # TODO
-        for i in range(len(backed_up_reward)):
-            if(len(obs[i]) != 0 and not done[i]):
-                max_action = self.training_predict(obs[i])
-                backed_up_reward[i] += self.gamma*max_action
 
-        self.add_to_data(zip(obs,action,backed_up_reward,done))
+        # take in the data
+        # flatten the observations
+        # put everything into numpy arrays
+        obs,action,new_obs,reward,done = zip(*data)
+        obs =np.array([np.array(x).flatten() for x  in obs])
+        next_obs = np.array([np.array(x).flatten() for x in new_obs])
+        reward = np.array(reward)
+        done = np.array(done)
+
+        self.data.extend(zip(obs,action,new_obs,reward,done))
+
 
     def train(self):
         # this should be fun
         # we want our network to predict the rewards given that input
-        with tf.device(device):
-            obs,action,reward,done = zip(*self.data)
-            x_train = np.array([np.array(x).flatten() for x  in obs])
-            print(x_train.shape)
-            y_train = np.array(reward)
-            self.model.fit(x_train,y_train,epochs=5)
+
+        # loss we want to maximize is 
+        # reward + gamma*max_a'Q(s',a',parameters) - Q(s,a,parameters) 
+        # the Q(s,a,parameters) is just the current value
+        # so we are going to say that 
+        # max_a'Q(s',a',parameters) is just how much reward we expect to get in this state, taking this action
+        # Luckily our model takes in a state and produces the amount of reward we expect if we took each action
+
+        # idea written in a formula
+        # Update q values
+        # Q[state, action] = Q[state, action] + lr * (reward + gamma * np.max(Q[new_state, :]) — Q[state, action])
+
+        # how do we formulate that as a deep learning question
+        # we want 
+        obs,action,next_obs,rewards,dones = zip(*self.data)
+        # all of these are numpy arrays
+        # if something looks weird it could be because
+        # we are vectorizing this calculation
+
+
+        model_value_of_next_state = self.model.predict(next_obs).max(1)
+        model_value_of_next_state = np.expand_dims(model_value_of_next_state,1) # turn it from [[1],[2],[3]] to [1,2,3]
+
+        target_for_this_state = rewards + self.gamma*model_value_of_next_state*(1-dones)
+
+
+
+
+
+
+
+        for i in range(len(backed_up_reward)):
+            if(len(obs[i]) != 0 and not done[i]):
+                backed_up_reward[i] += self.gamma*best_next_actions[i] + backed_up_reward[i+1]
+            else:
+                # no observation that makes any sense
+                backed_up_reward[i] = reward[i]
+
+        
 
     def training_predict(self,obs):
         # no randomness
         # and we return the magnitude of the value not just which one was max
         obs = np.array([np.array(obs).flatten()])
-        answer = self.model.predict(obs)[0]
+        answer = self.model.predict(obs)
         largest_index = np.argmax(answer)
         return answer[largest_index]
 
