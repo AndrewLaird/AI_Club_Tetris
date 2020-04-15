@@ -406,7 +406,7 @@ class TetrisGame:
         self.tile_x = temp_x
         self.tile_shape = new_shape
 
-    def swap_tile(self):  #################################################
+    def swap_tile(self):
         if not self.active or self.paused:
             return
 
@@ -489,15 +489,7 @@ class TetrisGame:
             for cx, val in enumerate(row):
                 if val == 0:
                     continue
-                try:
-                    self.board[cy + self.tile_y - 1][min(cx + self.tile_x, 9)] = val
-                except IndexError:
-                    print(f"Y Coords: {cx + self.tile_x}/{len(self.board)}")
-                    print(f"X Coords: {cy + self.tile_y - 1}/{len(self.board[cx + self.tile_x])}")
-                    print(f"Tile: {self.tile}")
-                    print(f"CX: {cx} CY: {cy}")
-                    self.board[cy + self.tile_y - 1] \
-                        [cx + self.tile_x] = val
+                self.board[cy + self.tile_y - 1][min(cx + self.tile_x, 9)] = val
 
     def reset(self):
         self.log("Resetting game...", 2)
@@ -527,7 +519,6 @@ class TetrisGame:
     def generate_tile_bank(self):
         self.tile_bank = list(TILE_SHAPES.keys())
         random.shuffle(self.tile_bank)
-        self.tile_bank = ["LINE", "CUBE"]
 
     def print_board(self, flattened=False):
         self.log("Printing debug board", 10)
