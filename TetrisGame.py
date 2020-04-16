@@ -38,8 +38,9 @@ MESSAGES = {
     # Display
     "TITLE": "Tetris",
     "CONTROLS": "Left/Right - Move tile\nUp - Rotate tile\nDown - Fast drop\nSpace - Insta-drop\nEscape - Play/Pause\nTab - Swap next tile",
-    "SCORE": "Score: {score} (x{lines})",
-    "HIGH_SCORE": "High Score: {}",
+    "HIGH_SCORE": "High Score: {:.2f} (x{})",
+    "SCORE": "Score: {:.2f} (x{})",
+    "FITNESS": "Fitness: {:.2f}",
     "SPEED": "Speed: {}ms",
     "NEXT_TILE": "Next tile: {}",
 }
@@ -55,8 +56,8 @@ MAX_FPS = 30
 ########################
 # Score Configurations #
 ########################
-MULTI_SCORE_ALGORITHM = lambda lines_cleared: 150 ** lines_cleared
-PER_STEP_SCORE_GAIN = 0.5
+MULTI_SCORE_ALGORITHM = lambda lines_cleared: 5 ** lines_cleared
+PER_STEP_SCORE_GAIN = 0.1
 
 ######################
 # STEP Configuration #
@@ -91,6 +92,14 @@ def getColorTuple(colorHex):
 class TetrisGame:
 
     def __init__(self):
+        # Scores
+        self.score = 0.0
+        self.lines = 0
+        self.high_score = 0.0
+        self.high_score_lines = 0
+        self.fitness = 0.0
+
+        # Initialize display stuff
         if HAS_DISPLAY:
             self.log("Initializing system...", 3)
             pygame.init()
@@ -109,11 +118,6 @@ class TetrisGame:
             # Setup callback functions
             self.on_score_changed_callbacks = []
 
-        # High-score
-        self.high_score = 0
-        self.score = 0
-
-        if HAS_DISPLAY:
             # Start the game
             self.start()
 
@@ -148,6 +152,7 @@ class TetrisGame:
         # Score
         self.score = 0
         self.lines = 0
+        self.fitness = 0.0
 
     # Start the UI loop
     def start(self):
@@ -254,18 +259,26 @@ class TetrisGame:
 
         # Score
         text_image = pygame.font.SysFont(FONT_NAME, 16).render(
-            MESSAGES.get("SCORE").format(score=self.score, lines=self.lines), False, getColorTuple(COLORS.get("WHITE")))
+            MESSAGES.get("SCORE").format(self.score, self.lines), False, getColorTuple(COLORS.get("WHITE")))
         self.screen.blit(text_image, (text_x_start, text_y_start))
         text_y_start += 20
 
         # High Score
+        high_score = self.score if self.score > self.high_score else self.high_score
+        high_score_lines = self.lines if self.lines > self.high_score_lines else self.high_score_lines
         text_image = pygame.font.SysFont(FONT_NAME, 16).render(
-            MESSAGES.get("HIGH_SCORE").format(self.score if self.score > self.high_score else self.high_score), False,
+            MESSAGES.get("HIGH_SCORE").format(high_score, high_score_lines), False,
             getColorTuple(COLORS.get("WHITE")))
         self.screen.blit(text_image, (text_x_start, text_y_start))
         text_y_start += 20
 
-        # Speed        
+        # Fitness score
+        text_image = pygame.font.SysFont(FONT_NAME, 16).render(
+            MESSAGES.get("FITNESS").format(self.fitness), False, getColorTuple(COLORS.get("WHITE")))
+        self.screen.blit(text_image, (text_x_start, text_y_start))
+        text_y_start += 20
+
+        # Speed
         speed = SPEED_DEFAULT if not SPEED_SCALE_ENABLED else int(max(50, SPEED_DEFAULT - self.score * SPEED_SCALE))
         text_image = pygame.font.SysFont(FONT_NAME, 16).render(MESSAGES.get("SPEED").format(speed), False,
                                                                getColorTuple(COLORS.get("WHITE")))
@@ -387,7 +400,7 @@ class TetrisGame:
         # Out of range detection
         if self.tile_x + len(new_shape[0]) > GRID_COL_COUNT:
             temp_x = GRID_COL_COUNT - len(new_shape[0])
-            # If collide, disallow rotation
+        # If collide, disallow rotation
         if self.check_collision(new_shape, (temp_x, self.tile_y)):
             return
         self.tile_x = temp_x
@@ -396,15 +409,29 @@ class TetrisGame:
     def swap_tile(self):
         if not self.active or self.paused:
             return
-        tile = self.get_next_tile(True)
-        self.tile_bank.insert(0, self.tile)
 
-        self.tile = tile
-        self.tile_shape = TILE_SHAPES.get(self.tile)[:]
+        new_tile = self.get_next_tile(False)
+        new_tile_shape = TILE_SHAPES.get(new_tile)[:]
+
+        temp_x, temp_y = self.tile_x, self.tile_y
 
         # Out of range detection
-        if self.tile_x + len(self.tile_shape[0]) > GRID_COL_COUNT:
-            self.tile_x = GRID_COL_COUNT - len(self.tile_shape[0])
+        if temp_x + len(self.tile_shape[0]) > GRID_COL_COUNT:
+            temp_x = GRID_COL_COUNT - len(self.tile_shape[0])
+        if temp_y + len(self.tile_shape) > GRID_ROW_COUNT:
+            temp_y = GRID_ROW_COUNT - len(self.tile_shape)
+
+        # If collide, disallow swapping
+        if self.check_collision(new_tile_shape, (temp_x, temp_y)):
+            return
+
+        # Swap next tile with current tile
+        self.get_next_tile(True)
+        self.tile_bank.insert(0, self.tile)
+        # Apply stats
+        self.tile = new_tile
+        self.tile_shape = new_tile_shape
+        self.tile_x, self.tile_y = temp_x, temp_y
 
     # Calculate score (called after every collision)
     def calculate_scores(self):
@@ -421,7 +448,9 @@ class TetrisGame:
             # Insert empty row at top
             self.board.insert(0, [0] * GRID_COL_COUNT)
             score_count += 1
-        # If cleared nothing, do nothing
+        # Calculate fitness score
+        self.fitness = self.get_fitness_score()
+        # If cleared nothing, early return
         if score_count == 0:
             return
         # Calculate total score based on algorithm
@@ -433,6 +462,7 @@ class TetrisGame:
         self.score += total_score
         self.lines += score_count
         self.log("Cleared " + str(score_count) + " rows with score " + str(total_score), 3)
+        # Calculate game speed
         pygame.time.set_timer(pygame.USEREVENT + 1, SPEED_DEFAULT if not SPEED_SCALE_ENABLED else int(
             max(50, SPEED_DEFAULT - self.score * SPEED_SCALE)))
 
@@ -459,13 +489,15 @@ class TetrisGame:
             for cx, val in enumerate(row):
                 if val == 0:
                     continue
-                self.board[cy + self.tile_y - 1][cx + self.tile_x] = val
+                self.board[cy + self.tile_y - 1][min(cx + self.tile_x, 9)] = val
 
     def reset(self):
         self.log("Resetting game...", 2)
         # Calculate high score
-        if self.high_score < self.score:
+        if self.score > self.high_score:
             self.high_score = self.score
+        if self.lines > self.high_score_lines:
+            self.high_score_lines = self.lines
         # Reset
         self.init_game()
         return self.board[:]
@@ -519,15 +551,51 @@ class TetrisGame:
                     board[y + self.tile_y][x + self.tile_x] = val
         return board
 
-    def render(self):
-        self.draw()
+    # Reference to https://codemyroad.wordpress.com/2013/04/14/tetris-ai-the-near-perfect-player/
+    def get_fitness_score(self):
+        return -0.5101 * sum(self.get_col_heights()) - 0.3566 * self.get_hole_count() - 0.1845 * self.get_bumpiness()
+
+    # Get height of each column
+    def get_col_heights(self):
+        heights = [0] * GRID_COL_COUNT
+        cols = list(range(GRID_COL_COUNT))
+        for neg_height, row in enumerate(self.board):
+            for i, val in enumerate(row):
+                if val == 0 or i not in cols:
+                    continue
+                heights[i] = GRID_ROW_COUNT - neg_height
+                cols.remove(i)
+        return heights
+
+    # Count of empty spaces below covers
+    def get_hole_count(self):
+        holes = 0
+        cols = [0] * GRID_COL_COUNT
+        for neg_height, row in enumerate(self.board):
+            height = GRID_ROW_COUNT - neg_height
+            for i, val in enumerate(row):
+                if val == 0 and cols[i] > height:
+                    holes += 1
+                    continue
+                if val != 0 and cols[i] == 0:
+                    cols[i] = height
+        return holes
+
+    # Get the unevenness of the board
+    def get_bumpiness(self):
+        bumpiness = 0
+        heights = self.get_col_heights()
+        for i in range(1, GRID_COL_COUNT):
+            bumpiness += abs(heights[i - 1] - heights[i])
+        return bumpiness
 
     # Action = index of { NOTHING, L, R, 2L, 2R, ROTATE, SWAP, FAST_FALL } # 8 INSTA_FALL } # 9
-    def step(self, action=0):
+    def step(self, action=0, use_fitness=False):
         # Update UI
         if HAS_DISPLAY:
             pygame.event.get()
         # Obtain previous score
+        previous_fitness = self.fitness
         previous_score = self.score
         # Move action
         if action in [1, 2, 3, 4]:
@@ -544,24 +612,18 @@ class TetrisGame:
 
         # Continue by 1 step
         self.drop()
-
         # >> Returns: board matrix, score change, is-game-over, next piece
-        return self.get_board_with_current_tile(flattened=True), self.score - previous_score, not self.active, self.get_next_tile()
+        measurement = self.score - previous_score
+        if use_fitness:
+            measurement = self.fitness - previous_fitness
+        return self.get_board_with_current_tile(flattened=True), measurement, not self.active, self.get_next_tile()
 
 
 if __name__ == "__main__":
-    HAS_DISPLAY = True
     print("Hello world!")
-    game = TetrisGame()
-    games = 0
-    if STEP_ACTION and not STEP_DEBUG:
-        while True:
-            # if random.randrange(10000) == 0:
-            #    game.draw()
-            if game.active:
-                game.step()
-            else:
-                game.reset()
-                games += 1
-                print(games)
+    # User testing (AKA play game)
+    HAS_DISPLAY = True
+    STEP_ACTION = False
+    STEP_DEBUG = False
+    TetrisGame()
     print("Goodbye world!")
