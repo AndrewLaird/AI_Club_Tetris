@@ -63,7 +63,7 @@ PER_STEP_SCORE_GAIN = 0.5
 ######################
 ALWAYS_DRAW = True
 STEP_ACTION = True
-STEP_DEBUG = True
+STEP_DEBUG = False
 
 TILES = ["LINE", "L", "L_REVERSED", "S", "S_REVERSED", "T", "CUBE"]
 TILE_SHAPES = {
@@ -540,13 +540,13 @@ class TetrisGame:
             self.swap_tile()
         # Fast fall / Insta-fall
         elif action in [7, 8]:
-            self.drop(instant=action == 8)
+            self.drop(instant= (action == 8))
 
         # Continue by 1 step
         self.drop()
 
         # >> Returns: board matrix, score change, is-game-over, next piece
-        return self.get_board_with_current_tile(), self.score - previous_score, not self.active, self.get_next_tile()
+        return self.get_board_with_current_tile(flattened=True), self.score - previous_score, not self.active, self.get_next_tile()
 
 
 if __name__ == "__main__":
