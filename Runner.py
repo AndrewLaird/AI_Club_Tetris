@@ -2,6 +2,7 @@ import TetrisGame
 import random
 import time
 from Pytorch_Agent import DQN_Agent
+import matplotlib.pyplot as plt
 
 
 def run_game(game,agent,render):

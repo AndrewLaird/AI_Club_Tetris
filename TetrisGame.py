@@ -438,7 +438,8 @@ class TetrisGame:
             self.swap_tile()
         # Fast fall / Insta-fall
         elif action in [7, 8]:
-            self.drop(instant=action == 8)
+            self.drop(instant= (action == 8))
+
         # Continue by 1 step
         self.drop()
         # >> Returns: board matrix, score change, is-game-over, next piece
@@ -476,6 +477,7 @@ class TetrisGame:
         scores = list(map(lambda a: round(a, 2), self.pseudo_step()))
         print(f"Step Summary:\nDo nothing: {scores[0]}\nLeft: {scores[1]}/{scores[3]}\nRight: {scores[2]}/{scores[4]}\nRotate: {scores[5]}\nSwap: {scores[6]}\n")
         print(f"Best action: {ACTIONS[scores.index(max(scores))]}\n\n")
+        return self.get_board_with_current_tile(flattened=True), measurement, not self.active, self.get_next_tile()
 
 
 if __name__ == "__main__":

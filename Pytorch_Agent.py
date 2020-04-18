@@ -24,7 +24,7 @@ class DQN_Model(nn.Module):
         self.dense3 = nn.Linear(1024,2048)
         self.dense4 = nn.Linear(2048,1024)
         self.dense5 = nn.Linear(1024,1024)
-        self.dense6 = nn.Linear(1024,4)
+        self.dense6 = nn.Linear(1024,6)
 
     def forward(self, x):
         x = F.relu(self.dense1(x))
@@ -45,28 +45,33 @@ class DQN_Agent():
         # or the amount that we don't want reward to propigate
         self.gamma = .9
         self.prob_random = .1
-        self.epochs = 25
+        self.epochs = 50
         # define the layers
         # will come in as flattend rep of the board game
         self.model = DQN_Model(input_size)
+        self.target_model = DQN_Model(input_size).to(device)
 
-        self.optimizer = optim.Adam(self.model.parameters(),lr=1e-3)
+        #self.model.load_state_dict(torch.load("Pytorch_DQN1.torch"))
+
+        self.update_target_model()
+
+
+        self.optimizer = optim.Adam(self.model.parameters(),lr=1e-4)
 
         self.data = []
 
-        self.data_max = 10000000
+        self.data_max = 20000
 
     def add_to_data(self,zipped_info):
         # check to make sure that data has room
         zipped_info = list(zipped_info)
         room_left = self.data_max - len(self.data) - len(list(zipped_info))
         if(room_left < 0):
-            print("removing data")
             # remove from the front
             del self.data[0:abs(room_left)]
 
         # add the info in
-        self.data.take_in_data(zipped_info)
+        self.data.extend(zipped_info)
         
 
     def take_in_data(self,data):
@@ -80,7 +85,7 @@ class DQN_Agent():
         #reward = torch.tensor(reward)
         #done = torch.tensor(done)
 
-        self.data.extend(zip(obs,action,new_obs,reward,done))
+        self.add_to_data(zip(obs,action,new_obs,reward,done))
 
 
     def train(self):
@@ -101,7 +106,8 @@ class DQN_Agent():
 
         # how do we formulate that as a deep learning question
         # we want 
-        obs,actions,next_obs,rewards,dones = zip(*self.data)
+        data = list(np.random.permutation(self.data))
+        obs,actions,next_obs,rewards,dones = zip(*data)
         # TODO Figure out why this can't be done in the take in data step
         obs = torch.tensor(obs).flatten(1).float().to(device)
         next_obs = torch.tensor(next_obs).flatten(1).float().to(device)
@@ -117,7 +123,7 @@ class DQN_Agent():
         for i in range(self.epochs):
             self.model.to(device)
 
-            model_value_of_next_state = self.model.forward(next_obs).detach().max(1)[0].unsqueeze(1)
+            model_value_of_next_state = self.target_model.forward(next_obs).detach().max(1)[0].unsqueeze(1)
 
             target_for_this_state = rewards + (self.gamma * model_value_of_next_state * running)
 
@@ -134,10 +140,22 @@ class DQN_Agent():
         self.model.to('cpu')
         torch.save(self.model.state_dict(),"Pytorch_DQN1.torch")
 
+        # cleanup memory
+        del obs
+        del next_obs
+        del rewards
+        del running
+        del actions
+
+        self.update_target_model()
+
+    def update_target_model(self):
+        self.target_model.load_state_dict(deepcopy(self.model.state_dict()))
+
 
     def predict(self,obs):
         if(random.random() < self.prob_random):
-            return random.randint(0,3)
+            return random.randint(0,5)
         
         obs = torch.tensor(obs).flatten().float()
 
