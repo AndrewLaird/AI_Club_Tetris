@@ -2,95 +2,13 @@
 import sys
 import random
 import pygame
-import copy
 import threading
 from datetime import datetime
-
-# Configurations (USER)
-SIZE_SCALE = 1
-SPEED_DEFAULT = 750  # 750 MS
-SPEED_SCALE_ENABLED = True  # game gets faster with more points?
-SPEED_SCALE = 0.05  # speed = max(50, 750 - SCORE * SPEED_SCALE)
-DISPLAY_PREDICTION = True
-HAS_DISPLAY = True
-MIN_DEBUG_LEVEL = 3
-
-FONT_NAME = "Consolas"
-
-COLORS = {
-    # Display
-    "BACKGROUND_BLACK": "000000",
-    "BACKGROUND_DARK": "021c2d",
-    "BACKGROUND_LIGHT": "00263f",
-    "TRIANGLE_GRAY": "efe6ff",
-    "WHITE": "ffffff",
-    # Tetris pieces
-    "TILE_LINE": "ffb900",
-    "TILE_L": "2753f1",
-    "TILE_L_REVERSED": "f7ff00",
-    "TILE_S": "ff6728",
-    "TILE_S_REVERSED": "11c5bf",
-    "TILE_T": "ae81ff",
-    "TILE_CUBE": "e94659"
-}
-
-MESSAGES = {
-    # Display
-    "TITLE": "Tetris",
-    "CONTROLS": "Left/Right - Move tile\nUp - Rotate tile\nDown - Fast drop\nSpace - Insta-drop\nEscape - Play/Pause\nTab - Swap next tile",
-    "HIGH_SCORE": "High Score: {:.2f} (x{})",
-    "SCORE": "Score: {:.2f} (x{})",
-    "FITNESS": "Fitness: {:.2f}",
-    "SPEED": "Speed: {}ms",
-    "NEXT_TILE": "Next tile: {}",
-}
-
-# Configurations (SYSTEM)
-GRID_ROW_COUNT = 20
-GRID_COL_COUNT = 10
-
-SCREEN_WIDTH = int(360 / 0.6 * SIZE_SCALE)
-SCREEN_HEIGHT = int(720 * SIZE_SCALE)
-MAX_FPS = 30
-
-########################
-# Score Configurations #
-########################
-MULTI_SCORE_ALGORITHM = lambda lines_cleared: 5 ** lines_cleared
-PER_STEP_SCORE_GAIN = 0.1
-
-######################
-# STEP Configuration #
-######################
-ALWAYS_DRAW = True
-STEP_ACTION = True
-STEP_DEBUG = False
-
-TILES = ["LINE", "L", "L_REVERSED", "S", "S_REVERSED", "T", "CUBE"]
-TILE_SHAPES = {
-    "LINE": [[1, 1, 1, 1]],
-    "L": [[0, 0, 2],
-          [2, 2, 2]],
-    "L_REVERSED": [[3, 0, 0],
-                   [3, 3, 3]],
-    "S": [[0, 4, 4],
-          [4, 4, 0]],
-    "S_REVERSED": [[5, 5, 0],
-                   [0, 5, 5]],
-    "T": [[6, 6, 6],
-          [0, 6, 0]],
-    "CUBE": [[7, 7],
-             [7, 7]]
-}
-
-
-def getColorTuple(colorHex):
-    colorHex = colorHex.replace("#", "")
-    return tuple(int(colorHex[i:i + 2], 16) for i in (0, 2, 4))
+from AI_Club_Tetris import TetrisUtils as TUtils
+from AI_Club_Tetris.TetrisSettings import *
 
 
 class TetrisGame:
-
     def __init__(self):
         # Scores
         self.score = 0.0
@@ -166,24 +84,7 @@ class TetrisGame:
         def loop():
             while True:
                 # Game control: step or auto?
-                if STEP_ACTION:
-                    # Command-line debugging
-                    if STEP_DEBUG:
-                        cmd = input("Command:")
-                        if cmd == "q":
-                            break
-                        elif cmd == "d":
-                            self.render()
-                        elif cmd == "p":
-                            self.print_board(True)
-                        else:
-                            try:
-                                cmd = int(cmd)
-                            except:
-                                continue
-                            self.step(cmd)
-                else:
-                    # Auto
+                if not STEP_ACTION:
                     self.update()
                 # Drawing of the UI
                 if not STEP_ACTION or ALWAYS_DRAW:
@@ -191,7 +92,7 @@ class TetrisGame:
                 clock.tick(MAX_FPS)
 
         # Use multi-threading?
-        if STEP_ACTION and not STEP_DEBUG:
+        if STEP_ACTION:
             th = threading.Thread(target=loop, daemon=False)
             th.start()
         else:
@@ -212,14 +113,14 @@ class TetrisGame:
     # Called every tick after update
     def draw(self):
         # Background layer
-        self.screen.fill(getColorTuple(COLORS.get("BACKGROUND_BLACK")))
+        self.screen.fill(TUtils.get_color_tuple(COLORS.get("BACKGROUND_BLACK")))
 
         ################
         # Tetris Board #
         ################
         # Layered background layer
         for a in range(GRID_COL_COUNT):
-            color = getColorTuple(COLORS.get("BACKGROUND_DARK" if a % 2 == 0 else "BACKGROUND_LIGHT"))
+            color = TUtils.get_color_tuple(COLORS.get("BACKGROUND_DARK" if a % 2 == 0 else "BACKGROUND_LIGHT"))
             pygame.draw.rect(self.screen, color,
                              (a * self.grid_size, 0, self.grid_size, SCREEN_HEIGHT))  # x, y, width, height
 
@@ -228,7 +129,9 @@ class TetrisGame:
         self.draw_tiles(self.board)
         # Draw hypothesized tile
         if DISPLAY_PREDICTION:
-            self.draw_tiles(self.tile_shape, (self.tile_x, self.get_current_collision_offset()), True)
+            self.draw_tiles(self.tile_shape, (
+                self.tile_x, TUtils.get_effective_height(self.board, self.tile_shape, (self.tile_x, self.tile_y))),
+                            True)
         # Draw current tile
         self.draw_tiles(self.tile_shape, (self.tile_x, self.tile_y))
 
@@ -246,48 +149,42 @@ class TetrisGame:
             message = "Game Over"
         elif self.paused:
             message = "= PAUSED ="
-        text_image = pygame.font.SysFont(FONT_NAME, 32).render(message, False, getColorTuple(COLORS.get("WHITE")))
+        text_image = pygame.font.SysFont(FONT_NAME, 32).render(message, False, TUtils.get_color_tuple(COLORS.get("WHITE")))
         self.screen.blit(text_image, (text_x_start, text_y_start))
         text_y_start = 60
 
         # Controls
         for msg in MESSAGES.get("CONTROLS").split("\n"):
-            text_image = pygame.font.SysFont(FONT_NAME, 16).render(msg, False, getColorTuple(COLORS.get("WHITE")))
+            text_image = pygame.font.SysFont(FONT_NAME, 16).render(msg, False, TUtils.get_color_tuple(COLORS.get("WHITE")))
             self.screen.blit(text_image, (text_x_start, text_y_start))
             text_y_start += 20
         text_y_start += 10
 
         # Score
-        text_image = pygame.font.SysFont(FONT_NAME, 16).render(
-            MESSAGES.get("SCORE").format(self.score, self.lines), False, getColorTuple(COLORS.get("WHITE")))
+        text_image = pygame.font.SysFont(FONT_NAME, 16).render(MESSAGES.get("SCORE").format(self.score, self.lines), False, TUtils.get_color_tuple(COLORS.get("WHITE")))
         self.screen.blit(text_image, (text_x_start, text_y_start))
         text_y_start += 20
 
         # High Score
         high_score = self.score if self.score > self.high_score else self.high_score
         high_score_lines = self.lines if self.lines > self.high_score_lines else self.high_score_lines
-        text_image = pygame.font.SysFont(FONT_NAME, 16).render(
-            MESSAGES.get("HIGH_SCORE").format(high_score, high_score_lines), False,
-            getColorTuple(COLORS.get("WHITE")))
+        text_image = pygame.font.SysFont(FONT_NAME, 16).render(MESSAGES.get("HIGH_SCORE").format(high_score, high_score_lines), False, TUtils.get_color_tuple(COLORS.get("WHITE")))
         self.screen.blit(text_image, (text_x_start, text_y_start))
         text_y_start += 20
 
         # Fitness score
-        text_image = pygame.font.SysFont(FONT_NAME, 16).render(
-            MESSAGES.get("FITNESS").format(self.fitness), False, getColorTuple(COLORS.get("WHITE")))
+        text_image = pygame.font.SysFont(FONT_NAME, 16).render(MESSAGES.get("FITNESS").format(self.fitness), False, TUtils.get_color_tuple(COLORS.get("WHITE")))
         self.screen.blit(text_image, (text_x_start, text_y_start))
         text_y_start += 20
 
         # Speed
         speed = SPEED_DEFAULT if not SPEED_SCALE_ENABLED else int(max(50, SPEED_DEFAULT - self.score * SPEED_SCALE))
-        text_image = pygame.font.SysFont(FONT_NAME, 16).render(MESSAGES.get("SPEED").format(speed), False,
-                                                               getColorTuple(COLORS.get("WHITE")))
+        text_image = pygame.font.SysFont(FONT_NAME, 16).render(MESSAGES.get("SPEED").format(speed), False, TUtils.get_color_tuple(COLORS.get("WHITE")))
         self.screen.blit(text_image, (text_x_start, text_y_start))
         text_y_start += 20
 
         # Next tile
-        text_image = pygame.font.SysFont(FONT_NAME, 16).render(MESSAGES.get("NEXT_TILE").format(self.get_next_tile()),
-                                                               False, getColorTuple(COLORS.get("WHITE")))
+        text_image = pygame.font.SysFont(FONT_NAME, 16).render(MESSAGES.get("NEXT_TILE").format(self.get_next_tile()), False, TUtils.get_color_tuple(COLORS.get("WHITE")))
         self.screen.blit(text_image, (text_x_start, text_y_start))
         text_y_start += 20
 
@@ -307,21 +204,21 @@ class TetrisGame:
                 # Draw rectangle
                 if not outline_only:
                     pygame.draw.rect(self.screen,
-                                     getColorTuple(COLORS.get("TILE_" + TILES[val - 1])),
+                                     TUtils.get_color_tuple(COLORS.get("TILE_" + TILES[val - 1])),
                                      (coord_x, coord_y, self.grid_size, self.grid_size))
                     pygame.draw.rect(self.screen,
-                                     getColorTuple(COLORS.get("BACKGROUND_BLACK")),
+                                     TUtils.get_color_tuple(COLORS.get("BACKGROUND_BLACK")),
                                      (coord_x, coord_y, self.grid_size, self.grid_size), 1)
                     # Draw highlight triangle
                     offset = int(self.grid_size / 10)
-                    pygame.draw.polygon(self.screen, getColorTuple(COLORS.get("TRIANGLE_GRAY")),
+                    pygame.draw.polygon(self.screen, TUtils.get_color_tuple(COLORS.get("TRIANGLE_GRAY")),
                                         ((coord_x + offset, coord_y + offset),
                                          (coord_x + 3 * offset, coord_y + offset),
                                          (coord_x + offset, coord_y + 3 * offset)))
                 else:
                     # Outline-only for prediction location
                     pygame.draw.rect(self.screen,
-                                     getColorTuple(COLORS.get("TILE_" + TILES[val - 1])),
+                                     TUtils.get_color_tuple(COLORS.get("TILE_" + TILES[val - 1])),
                                      (coord_x + 1, coord_y + 1, self.grid_size - 2, self.grid_size - 2), 1)
 
     def draw_next_tile(self, offsets):
@@ -333,13 +230,11 @@ class TetrisGame:
                 coord_x = offsets[0] + x * size
                 coord_y = offsets[1] + y * size
                 # Draw rectangle
-                pygame.draw.rect(self.screen, getColorTuple(COLORS.get("TILE_" + TILES[val - 1])),
-                                 (coord_x, coord_y, size, size))
-                pygame.draw.rect(self.screen, getColorTuple(COLORS.get("BACKGROUND_BLACK")),
-                                 (coord_x, coord_y, size, size), 1)
+                pygame.draw.rect(self.screen, TUtils.get_color_tuple(COLORS.get("TILE_" + TILES[val - 1])), (coord_x, coord_y, size, size))
+                pygame.draw.rect(self.screen, TUtils.get_color_tuple(COLORS.get("BACKGROUND_BLACK")), (coord_x, coord_y, size, size), 1)
                 # Draw highlight triangle
                 offset = int(size / 10)
-                pygame.draw.polygon(self.screen, getColorTuple(COLORS.get("TRIANGLE_GRAY")),
+                pygame.draw.polygon(self.screen, TUtils.get_color_tuple(COLORS.get("TRIANGLE_GRAY")),
                                     ((coord_x + offset, coord_y + offset),
                                      (coord_x + 3 * offset, coord_y + offset),
                                      (coord_x + offset, coord_y + 3 * offset)))
@@ -351,7 +246,7 @@ class TetrisGame:
         self.tile_y = 0
 
         self.log("Spawning a new " + self.tile + " tile!", 1)
-        if self.check_collision(self.tile_shape, (self.tile_x, self.tile_y)):
+        if TUtils.check_collision(self.board, self.tile_shape, (self.tile_x, self.tile_y)):
             self.active = False
             self.paused = True
 
@@ -366,7 +261,7 @@ class TetrisGame:
             return
         # Drop the tile
         if instant:
-            destination = self.get_current_collision_offset()
+            destination = TUtils.get_effective_height(self.board, self.tile_shape, (self.tile_x, self.tile_y))
             self.score += PER_STEP_SCORE_GAIN * (destination - self.tile_y)
             self.tile_y = destination
         else:
@@ -374,7 +269,7 @@ class TetrisGame:
             self.score += PER_STEP_SCORE_GAIN
 
         # If no collision happen, skip
-        if not self.check_collision(self.tile_shape, (self.tile_x, self.tile_y)):
+        if not TUtils.check_collision(self.board, self.tile_shape, (self.tile_x, self.tile_y)):
             return
         # Collided! Add tile to board, spawn new tile, and calculate scores
         self.add_tile_to_board()
@@ -388,31 +283,33 @@ class TetrisGame:
         # Clamping
         new_x = max(0, min(new_x, GRID_COL_COUNT - len(self.tile_shape[0])))
         # Cannot "override" blocks AKA cannot move when it is blocked
-        if self.check_collision(self.tile_shape, (new_x, self.tile_y)):
+        if TUtils.check_collision(self.board, self.tile_shape, (new_x, self.tile_y)):
             return
         self.tile_x = new_x
 
-    def rotate_tile(self):
+    # Returns: (success, offset_x, tile_shape)
+    def rotate_tile(self, pseudo=False):
         if not self.active or self.paused:
-            return
-        new_shape = list(zip(*reversed(self.tile_shape)))
+            return False, self.tile_x, self.tile_shape
+        new_shape = TUtils.get_rotated_tile_(self.tile_shape)
         temp_x = self.tile_x
         # Out of range detection
         if self.tile_x + len(new_shape[0]) > GRID_COL_COUNT:
             temp_x = GRID_COL_COUNT - len(new_shape[0])
         # If collide, disallow rotation
-        if self.check_collision(new_shape, (temp_x, self.tile_y)):
-            return
-        self.tile_x = temp_x
-        self.tile_shape = new_shape
+        if TUtils.check_collision(self.board, new_shape, (temp_x, self.tile_y)):
+            return False, self.tile_x, self.tile_shape
+        if not pseudo:
+            self.tile_x = temp_x
+            self.tile_shape = new_shape
+        return True, temp_x, new_shape
 
-    def swap_tile(self):
+    # Returns: (success, offsets, tile_shape)
+    def swap_tile(self, pseudo=False):
         if not self.active or self.paused:
-            return
-
+            return False, (self.tile_x, self.tile_y), self.tile_shape
         new_tile = self.get_next_tile(False)
         new_tile_shape = TILE_SHAPES.get(new_tile)[:]
-
         temp_x, temp_y = self.tile_x, self.tile_y
 
         # Out of range detection
@@ -422,16 +319,18 @@ class TetrisGame:
             temp_y = GRID_ROW_COUNT - len(self.tile_shape)
 
         # If collide, disallow swapping
-        if self.check_collision(new_tile_shape, (temp_x, temp_y)):
-            return
+        if TUtils.check_collision(self.board, new_tile_shape, (temp_x, temp_y)):
+            return False, (self.tile_x, self.tile_y), self.tile_shape
 
-        # Swap next tile with current tile
-        self.get_next_tile(True)
-        self.tile_bank.insert(0, self.tile)
-        # Apply stats
-        self.tile = new_tile
-        self.tile_shape = new_tile_shape
-        self.tile_x, self.tile_y = temp_x, temp_y
+        if not pseudo:
+            # Swap next tile with current tile
+            self.get_next_tile(True)
+            self.tile_bank.insert(0, self.tile)
+            # Apply stats
+            self.tile = new_tile
+            self.tile_shape = new_tile_shape
+            self.tile_x, self.tile_y = temp_x, temp_y
+        return True, (temp_x, temp_y), new_tile_shape
 
     # Calculate score (called after every collision)
     def calculate_scores(self):
@@ -449,7 +348,7 @@ class TetrisGame:
             self.board.insert(0, [0] * GRID_COL_COUNT)
             score_count += 1
         # Calculate fitness score
-        self.fitness = self.get_fitness_score()
+        self.fitness = TUtils.get_fitness_score(self.board)
         # If cleared nothing, early return
         if score_count == 0:
             return
@@ -465,24 +364,6 @@ class TetrisGame:
         # Calculate game speed
         pygame.time.set_timer(pygame.USEREVENT + 1, SPEED_DEFAULT if not SPEED_SCALE_ENABLED else int(
             max(50, SPEED_DEFAULT - self.score * SPEED_SCALE)))
-
-    def get_current_collision_offset(self):
-        offset_y = self.tile_y
-        while not self.check_collision(self.tile_shape, (self.tile_x, offset_y)):
-            offset_y += 1
-        return offset_y - 1
-
-    def check_collision(self, tile_shape, offsets):
-        for cy, row in enumerate(tile_shape):
-            for cx, val in enumerate(row):
-                if val == 0:
-                    continue
-                try:
-                    if self.board[cy + offsets[1]][cx + offsets[0]]:
-                        return True
-                except IndexError:
-                    return True
-        return False
 
     def add_tile_to_board(self):
         for cy, row in enumerate(self.tile_shape):
@@ -521,9 +402,8 @@ class TetrisGame:
         random.shuffle(self.tile_bank)
 
     def print_board(self, flattened=False):
-        self.log("Printing debug board", 10)
-        for i, row in enumerate(self.get_board_with_current_tile(flattened=flattened)):
-            print("{:02d}".format(i), row)
+        TUtils.print_board(
+            TUtils.get_board_with_tile(self.board, self.tile_shape, (self.tile_x, self.tile_y), flattened))
 
     def log(self, message, level):
         if MIN_DEBUG_LEVEL > level:
@@ -539,57 +419,7 @@ class TetrisGame:
     def subscribe_on_score_changed(self, callback):
         self.on_score_changed_callbacks.append(callback)
 
-    def get_board_with_current_tile(self, flattened=False):
-        board = copy.deepcopy(self.board)
-        # If flatten, change all numbers to 0/1
-        if flattened:
-            board = [[int(bool(val)) for val in row] for row in board]
-        # Add current tile (do not flatten)
-        for y, row in enumerate(self.tile_shape):
-            for x, val in enumerate(row):
-                if val != 0:
-                    board[y + self.tile_y][x + self.tile_x] = val
-        return board
-
-    # Reference to https://codemyroad.wordpress.com/2013/04/14/tetris-ai-the-near-perfect-player/
-    def get_fitness_score(self):
-        return -0.5101 * sum(self.get_col_heights()) - 0.3566 * self.get_hole_count() - 0.1845 * self.get_bumpiness()
-
-    # Get height of each column
-    def get_col_heights(self):
-        heights = [0] * GRID_COL_COUNT
-        cols = list(range(GRID_COL_COUNT))
-        for neg_height, row in enumerate(self.board):
-            for i, val in enumerate(row):
-                if val == 0 or i not in cols:
-                    continue
-                heights[i] = GRID_ROW_COUNT - neg_height
-                cols.remove(i)
-        return heights
-
-    # Count of empty spaces below covers
-    def get_hole_count(self):
-        holes = 0
-        cols = [0] * GRID_COL_COUNT
-        for neg_height, row in enumerate(self.board):
-            height = GRID_ROW_COUNT - neg_height
-            for i, val in enumerate(row):
-                if val == 0 and cols[i] > height:
-                    holes += 1
-                    continue
-                if val != 0 and cols[i] == 0:
-                    cols[i] = height
-        return holes
-
-    # Get the unevenness of the board
-    def get_bumpiness(self):
-        bumpiness = 0
-        heights = self.get_col_heights()
-        for i in range(1, GRID_COL_COUNT):
-            bumpiness += abs(heights[i - 1] - heights[i])
-        return bumpiness
-
-    # Action = index of { NOTHING, L, R, 2L, 2R, ROTATE, SWAP, FAST_FALL } # 8 INSTA_FALL } # 9
+    # Action = index of { NOTHING, L, R, 2L, 2R, ROTATE, SWAP, FAST_FALL, INSTA_FALL }
     def step(self, action=0, use_fitness=False):
         # Update UI
         if HAS_DISPLAY:
@@ -609,14 +439,43 @@ class TetrisGame:
         # Fast fall / Insta-fall
         elif action in [7, 8]:
             self.drop(instant=action == 8)
-
         # Continue by 1 step
         self.drop()
         # >> Returns: board matrix, score change, is-game-over, next piece
         measurement = self.score - previous_score
         if use_fitness:
             measurement = self.fitness - previous_fitness
-        return self.get_board_with_current_tile(), measurement, not self.active, self.get_next_tile()
+        board = TUtils.get_board_with_tile(self.board, self.tile_shape, (self.tile_x, self.tile_y), True)
+        return board, measurement, not self.active, self.get_next_tile()
+
+    # Action = index of { NOTHING, L, R, 2L, 2R, ROTATE, SWAP, FAST_FALL, INSTA_FALL }
+    def pseudo_step(self):
+        scores = [0] * 9
+        curr_score = TUtils.get_fitness_score(TUtils.get_future_board_with_tile(self.board, self.tile, self.tile_x))
+        # Wait action
+        for action in [0, 7, 8]:
+            scores[action] = curr_score
+        # Move left once
+        scores[1] = curr_score if TUtils.check_collision(self.board, self.tile_shape, (self.tile_x - 1, self.tile_y)) else TUtils.get_fitness_score(TUtils.get_future_board_with_tile(self.board, self.tile, self.tile_x - 1))
+        # Move right once
+        scores[2] = curr_score if TUtils.check_collision(self.board, self.tile_shape, (self.tile_x + 1, self.tile_y)) else TUtils.get_fitness_score(TUtils.get_future_board_with_tile(self.board, self.tile, self.tile_x + 1))
+        # Move left twice
+        scores[3] = scores[1] if TUtils.check_collision(self.board, self.tile_shape, (self.tile_x - 2, self.tile_y)) else TUtils.get_fitness_score(TUtils.get_future_board_with_tile(self.board, self.tile, self.tile_x - 2))
+        # Move right twice
+        scores[4] = scores[2] if TUtils.check_collision(self.board, self.tile_shape, (self.tile_x + 2, self.tile_y)) else TUtils.get_fitness_score(TUtils.get_future_board_with_tile(self.board, self.tile, self.tile_x + 2))
+        # Rotate
+        success, offset_x, tile_shape = self.rotate_tile(pseudo=True)
+        scores[5] = curr_score if not success else TUtils.get_fitness_score(TUtils.get_future_board_with_tile(self.board, tile_shape, offset_x))
+        # Swap
+        success, offsets, tile_shape = self.swap_tile(pseudo=True)
+        scores[6] = curr_score if not success else TUtils.get_fitness_score(TUtils.get_future_board_with_tile(self.board, tile_shape, offsets[0]))
+
+        return scores
+
+    def print_pseudo_step(self):
+        scores = list(map(lambda a: round(a, 2), self.pseudo_step()))
+        print(f"Step Summary:\nDo nothing: {scores[0]}\nLeft: {scores[1]}/{scores[3]}\nRight: {scores[2]}/{scores[4]}\nRotate: {scores[5]}\nSwap: {scores[6]}\n")
+        print(f"Best action: {ACTIONS[scores.index(max(scores))]}\n\n")
 
 
 if __name__ == "__main__":
@@ -624,6 +483,5 @@ if __name__ == "__main__":
     # User testing (AKA play game)
     HAS_DISPLAY = True
     STEP_ACTION = False
-    STEP_DEBUG = False
     TetrisGame()
     print("Goodbye world!")

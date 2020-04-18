@@ -26,7 +26,7 @@ class DQN_Model(nn.Module):
         self.dense3 = nn.Linear(1024, 2048)
         self.dense4 = nn.Linear(2048, 1024)
         self.dense5 = nn.Linear(1024, 1024)
-        self.dense6 = nn.Linear(1024, 9)
+        self.dense6 = nn.Linear(1024, 8)
 
     def forward(self, x):
         x = F.relu(self.dense1(x))
@@ -57,22 +57,9 @@ class DQN_Agent():
 
         self.data = []
 
-        self.data_max = 10000000
-
-    def add_to_data(self, zipped_info):
-        # check to make sure that data has room
-        zipped_info = list(zipped_info)
-        room_left = self.data_max - len(self.data) - len(list(zipped_info))
-        if (room_left < 0):
-            print("removing data")
-            # remove from the front
-            del self.data[0:abs(room_left)]
-
-        # add the info in
-        self.data.take_in_data(zipped_info)
+        self.data_max = 50_000
 
     def take_in_data(self, data):
-
         # take in the data
         # flatten the observations
         # put everything into numpy arrays
@@ -81,8 +68,9 @@ class DQN_Agent():
         # new_obs = torch.tensor(new_obs).flatten(1)
         # reward = torch.tensor(reward)
         # done = torch.tensor(done)
-
         self.data.extend(zip(obs, action, new_obs, reward, done))
+        if len(self.data) > self.data_max:
+            del self.data[0:len(self.data) - self.data_max]
 
     def train(self):
         print("Training on this many samples", len(self.data))
@@ -135,10 +123,9 @@ class DQN_Agent():
         torch.save(self.model.state_dict(), f"models/neo/agent_{int(round(time.time() * 1000))}.torch")
 
     def predict(self, obs):
-        if (random.random() < self.prob_random):
+        if random.random() < self.prob_random:
             return random.randint(0, 3)
 
         obs = torch.tensor(obs).flatten().float()
-
         answer = self.model.forward(obs).detach()
         return np.argmax(answer)
