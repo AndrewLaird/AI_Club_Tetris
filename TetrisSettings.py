@@ -53,7 +53,7 @@ MAX_FPS = 30
 # Score Configurations #
 ########################
 MULTI_SCORE_ALGORITHM = lambda lines_cleared: 5 ** lines_cleared
-PER_STEP_SCORE_GAIN = 0.1
+PER_STEP_SCORE_GAIN = 0.0
 
 # Fitness function configuration
 # https://luckytoilet.wordpress.com/2011/05/27/coding-a-tetris-ai-using-a-genetic-algorithm/

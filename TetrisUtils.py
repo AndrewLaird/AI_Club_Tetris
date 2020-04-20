@@ -49,17 +49,16 @@ def get_future_board_with_tile(board, tile, offsets, flattened=False):
 
 
 def get_best_actions(board, curr_tile, next_tile, offsets):
-    # Boards: 3D array
-    # [[curr_tile], [next_tile]]
-    # Tile: 2D array
+    # Tiles:
+    # [curr_tile, next_tile]
+    # Rotations:
     # [rotation 0, rotation 1, rotation 2, rotation 3]
-    # Rotation: 1D array
+    # X Coords:
     # [TileX 0, ..., TileX N]
     best_fitness = -9999
     best_tile_index = -1
     best_rotation = -1
     best_x = -1
-    best_board = []
 
     tiles = [curr_tile, next_tile]
     # 2 tiles: current and next
@@ -67,7 +66,6 @@ def get_best_actions(board, curr_tile, next_tile, offsets):
         tile = tiles[tile_index]
         # Rotation: 0-3 times (4x is the same as 0x)
         for rotation_count in range(0, 4):
-            tile = get_rotated_tile_(tile)
             # X movement
             for x in range(0, GRID_COL_COUNT - len(tile[0]) + 1):
                 # TODO: check if the X is actually reachable
@@ -78,14 +76,15 @@ def get_best_actions(board, curr_tile, next_tile, offsets):
                     best_tile_index = tile_index
                     best_rotation = rotation_count
                     best_x = x
-                    best_board = new_board
+            # Rotate tile (prep for next iteration)
+            tile = get_rotated_tile(tile)
 
     # Obtained best stats, now convert them into sequences of actions
     # Action = index of { NOTHING, L, R, 2L, 2R, ROTATE, SWAP, FAST_FALL, INSTA_FALL }
     actions = []
     if tiles[best_tile_index] != curr_tile:
         actions.append(ACTIONS.index("SWAP"))
-    for _ in range(best_rotation + 1):
+    for _ in range(best_rotation):
         actions.append(ACTIONS.index("ROTATE"))
     temp_x = offsets[0]
     while temp_x != best_x:
@@ -106,12 +105,12 @@ def print_board(board):
         print("{:02d}".format(i), row)
 
 
-def get_rotated_tile_(tile):
+def get_rotated_tile(tile):
     return list(zip(*reversed(tile)))
 
 
 def get_color_tuple(color_hex):
-    if color_hex == None:
+    if color_hex is None:
         color_hex = "11c5bf"
     color_hex = color_hex.replace("#", "")
     return tuple(int(color_hex[i:i + 2], 16) for i in (0, 2, 4))

@@ -291,7 +291,7 @@ class TetrisGame:
     def rotate_tile(self, pseudo=False):
         if not self.active or self.paused:
             return False, self.tile_x, self.tile_shape
-        new_shape = TUtils.get_rotated_tile_(self.tile_shape)
+        new_shape = TUtils.get_rotated_tile(self.tile_shape)
         temp_x = self.tile_x
         # Out of range detection
         if self.tile_x + len(new_shape[0]) > GRID_COL_COUNT:
