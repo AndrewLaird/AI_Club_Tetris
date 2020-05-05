@@ -263,13 +263,13 @@ class TetrisGame:
         if instant:
             destination = TUtils.get_effective_height(self.board, self.tile_shape, (self.tile_x, self.tile_y))
             self.score += PER_STEP_SCORE_GAIN * (destination - self.tile_y)
-            self.tile_y = destination
+            self.tile_y = destination + 1
         else:
             self.tile_y += 1
             self.score += PER_STEP_SCORE_GAIN
 
         # If no collision happen, skip
-        if not TUtils.check_collision(self.board, self.tile_shape, (self.tile_x, self.tile_y)):
+        if not TUtils.check_collision(self.board, self.tile_shape, (self.tile_x, self.tile_y)) and not instant:
             return
         # Collided! Add tile to board, spawn new tile, and calculate scores
         self.add_tile_to_board()
@@ -441,7 +441,7 @@ class TetrisGame:
             self.drop(instant=(action == 8))
         # Continue by 1 step
         self.drop()
-        # >> Returns: board matrix, score change, is-game-over, next piece
+        # >> Returns: board matrix (state), score change (reward), is-game-over (done), next piece (extras)
         measurement = self.score - previous_score
         if use_fitness:
             measurement = self.fitness - previous_fitness
